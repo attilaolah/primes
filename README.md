@@ -1,14 +1,15 @@
 # Attila's Primes [![wercker status](https://app.wercker.com/status/81bf2e1abe235c766b0e09a5e3c87c0d/s/ "wercker status")](https://app.wercker.com/project/bykey/81bf2e1abe235c766b0e09a5e3c87c0d)
 
-> My personal collection of prime numbers, just for fun.
+> My personal collection of prime numbers. Just for fun.
 
-This repo contains a random collection of [Pratt][2] [primality
-certificates][1].
+### Pratt Certificates
 
-### Certificate format
+This repo contains a collection of JSON-encoded [Pratt][2] [certificates][1].
 
-They are JSON-encoded in a simple format. The following is an example of a
-valid certificate for 1021:
+The format of the certificates is compact so that we don't use too much of the
+space that is freely provided to us by GitHub.
+
+The following is an example of a valid certificate for 1021:
 
 ```json
 [[1021, 10,
@@ -40,17 +41,24 @@ except for the number 2, which we believe to be prime without checking.
 The above example could be written in plain text, like this:
 
 ```
-1021 = 17·5·3·2²+1, witness = 10;
-  17 = 2⁴+1,        witness =  3;
-   5 = 2²+1,        witness =  2;
-   3 = 2+1,         witness =  2;
+1021 (witness: 10) = 17·5·3·2²+1;
+  17 (witness:  3) = 2⁴+1;
+   5 (witness:  2) = 2²+1;
+   3 (witness:  2) = 2+1;
    2 is prime.
 ```
 
-### PRs are welcome!
+### Pull Requests, Please!
 
-Pull requests are welcome, as long as they add a new prime that doesn't break
-the tests. How you found the prime does not matter.
+Pull requests are always welcome, as long as:
+
+* they add at least one new prime,
+* they don't break the tests, and
+* the primes are bigger than the smallest one we have.
+
+I absolutely don't care how you've found the prime, but you're welcome to share
+that in another repo.
+
 
 [1]: //en.wikipedia.org/wiki/Primality_certificate
 [2]: //en.wikipedia.org/wiki/Primality_certificate#Pratt_certificates
