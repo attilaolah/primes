@@ -1,4 +1,4 @@
-# Attila's Primes
+# Attila's Primes [![wercker status](https://app.wercker.com/status/81bf2e1abe235c766b0e09a5e3c87c0d/s/ "wercker status")](https://app.wercker.com/project/bykey/81bf2e1abe235c766b0e09a5e3c87c0d)
 
 > My personal collection of prime numbers, just for fun.
 
