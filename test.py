@@ -1,15 +1,15 @@
 """Verify Pratt certificates."""
 import json
 import os
-import sys
 
 from fractions import gcd
 
 
-assert len(sys.argv) == 2
+LIMIT = 100
+DB = 'pratt'
 
-DB = sys.argv[1]
 assert os.path.isdir(DB)
+assert len(os.listdir(DB)) < LIMIT
 
 
 class _Single(tuple):

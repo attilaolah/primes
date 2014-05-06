@@ -4,4 +4,4 @@ build:
   - script:
       name: test all primes
       code: |
-        python3 test.py pratt
+        python3 test.py
