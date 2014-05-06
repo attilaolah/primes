@@ -1,4 +1,7 @@
 box: wercker/python
 build:
   steps:
-    - python3 ._test.py
+  - script:
+      name: test all primes
+      code: |
+        python3 test.py pratt
