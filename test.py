@@ -1,6 +1,7 @@
 """Verify Pratt certificates."""
 import json
 import os
+import sys
 
 from fractions import gcd
 
@@ -35,6 +36,13 @@ class _Single(tuple):
             assert exp > 1
             prime *= factor**exp
         assert self.prime == prime+1
+        output('.')
+        assert pow(self.witness, prime, self.prime) == 1
+        for factor in self.factors:
+            if isinstance(factor, list):
+                factor = factor[0]
+            assert pow(self.witness, prime//factor, self.prime) != 1
+            output('.')
 
     @property
     def prime(self):
@@ -87,7 +95,15 @@ def load_file(filename):
 def test_all():
     """Test every certificate."""
     for cert in os.listdir(DB):
+        output(cert.replace('.json', ': '))
         load_file(cert).verify()
+        output('\n')
+
+
+def output(text):
+    """Print without a buffer."""
+    sys.stdout.write(text)
+    sys.stdout.flush()
 
 
 if __name__ == '__main__':
