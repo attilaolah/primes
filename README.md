@@ -56,9 +56,12 @@ Pull requests are always welcome, as long as:
 * they don't break the tests, and
 * the primes are bigger than the smallest one we have.
 
-I absolutely don't care how you've found the prime, but you're welcome to share
-that in another repo.
 
+### Tests
+
+A quick check of the certificate format can be done by running `python test.py`
+(Python 3 will run faster than Python 2). To run a full test (which is way
+slower than the short check), run `python test.py --verify`.
 
 [1]: //en.wikipedia.org/wiki/Primality_certificate
 [2]: //en.wikipedia.org/wiki/Primality_certificate#Pratt_certificates

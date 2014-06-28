@@ -38,11 +38,12 @@ class _Single(tuple):
         assert self.prime == prime+1
         output('.')
         assert pow(self.witness, prime, self.prime) == 1
-        for factor in self.factors:
-            if isinstance(factor, list):
-                factor = factor[0]
-            assert pow(self.witness, prime//factor, self.prime) != 1
-            output('.')
+        if '--verify' in sys.argv:
+            for factor in self.factors:
+                if isinstance(factor, list):
+                    factor = factor[0]
+                assert pow(self.witness, prime//factor, self.prime) != 1
+                output('.')
 
     @property
     def prime(self):
