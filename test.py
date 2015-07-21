@@ -1,16 +1,8 @@
-"""Verify Pratt certificates."""
+"""Verify a single Pratt certificate."""
 import json
-import os
 import sys
 
 from fractions import gcd
-
-
-LIMIT = 100
-DB = 'pratt'
-
-assert os.path.isdir(DB)
-assert len(os.listdir(DB)) < LIMIT
 
 
 class _Single(tuple):
@@ -87,20 +79,6 @@ class _Pratt(list):
                     assert factor in primes
 
 
-def load_file(filename):
-    """JSON-decode a certificate from a filename."""
-    with open(os.path.join(DB, filename)) as src:
-        return _Pratt(json.load(src))
-
-
-def test_all():
-    """Test every certificate."""
-    for cert in os.listdir(DB):
-        output(cert.replace('.json', ': '))
-        load_file(cert).verify()
-        output('\n')
-
-
 def output(text):
     """Print without a buffer."""
     sys.stdout.write(text)
@@ -108,4 +86,4 @@ def output(text):
 
 
 if __name__ == '__main__':
-    test_all()
+    _Pratt(json.load(sys.stdin)).verify()

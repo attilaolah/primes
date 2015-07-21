@@ -1,42 +1,40 @@
-# Attila's Primes [![wercker status](https://app.wercker.com/status/81bf2e1abe235c766b0e09a5e3c87c0d/s/ "wercker status")](https://app.wercker.com/project/bykey/81bf2e1abe235c766b0e09a5e3c87c0d)
+# `primes` [![wercker status](https://app.wercker.com/status/81bf2e1abe235c766b0e09a5e3c87c0d/s/ "wercker status")](https://app.wercker.com/project/bykey/81bf2e1abe235c766b0e09a5e3c87c0d)
 
-> My personal collection of prime numbers. Just for fun.
+This repo contains a single prime number and its [Pratt certificate][2]. The
+prime is JSON-encoded in the file `PRIME.json`. Previous primes can be found in
+the git history.
 
-### Pratt Certificates
 
-This repo contains a collection of JSON-encoded [Pratt][2] [certificates][1].
+## Pratt Certificates
 
-The format of the certificates is compact so that we don't use too much of the
-space that is freely provided to us by GitHub.
-
-The following is an example of a valid certificate for 1021:
+Pratt certificates are JSON-encoded and pretty-printed. The following is an
+example of a valid certificate for 1021, compacted for readability.
 
 ```json
-[[1021, 10,
-  17,
-  5,
-  3,
-  [2, 2]],
- [17, 3,
-  [2, 4]],
- [5, 2,
-  [2, 2]],
- [3, 2,
-  2]]
+[
+  [1021, 10, 17, 5, 3, [2, 2]],
+  [17, 3, [2, 4]],
+  [5, 2, [2, 2]],
+  [3, 2, 2]
+]
 ```
 
-A valid certificate is a list of certificate parts. Each part in itself is also
-a list, containing at least three elements:
+A valid certificate is an array of certificate parts. Each part is itself also
+an array, containing at least three elements:
 
 1. the prime
 2. the witness
 3. one or more factors
 
+In the above example, the first certificate part is `[1021, 10, 17, 5, 3, [2,
+2]]`. `1021` is the prime, `10` is the witness, the rest are the factors.
+
 Each factor can be either a number, or a list of two numbers, in which case the
-second number is the exponent.
+second number is the exponent. In the first part of the above example, `17`,
+`5` and `3` are simple factors, and `[2, 2]` is a factor representing 2².
 
 Every factor of every part of the chain must also have its own certificate,
-except for the number 2, which we believe to be prime without checking.
+except for the number 2, which is a known prime.
 
 The above example could be written in plain text, like this:
 
@@ -48,20 +46,19 @@ The above example could be written in plain text, like this:
    2 is prime.
 ```
 
-### Pull Requests, Please!
 
-Pull requests are always welcome, as long as:
+## Pull Requests
 
-* they add at least one new prime,
-* they don't break the tests, and
-* the primes are bigger than the smallest one we have.
+Pull requests changing the prime number to a bigger one are welcome.
 
 
-### Tests
+## Tests
 
-A quick check of the certificate format can be done by running `python test.py`
-(Python 3 will run faster than Python 2). To run a full test (which is way
-slower than the short check), run `python test.py --verify`.
+A quick check of the certificate format can be done by running `python test.py
+< PRIME.json`. To run a full test (which is way slower than the short check),
+run `python test.py --verify < PRIME.json`.
+
+Note that Python 3 will run the tests somewhat faster than Python 2.
 
 [1]: //en.wikipedia.org/wiki/Primality_certificate
 [2]: //en.wikipedia.org/wiki/Primality_certificate#Pratt_certificates

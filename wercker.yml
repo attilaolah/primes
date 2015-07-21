@@ -1,7 +1,8 @@
-box: wercker/python
+box: python:3
+
 build:
   steps:
   - script:
-      name: test all primes
+      name: test
       code: |
-        python3 test.py
+        python test.py < PRIME.json
