@@ -28,14 +28,15 @@ class _Single(tuple):
             assert exp > 1
             prime *= factor**exp
         assert self.prime == prime+1
-        output('.')
+        output('#')
         assert pow(self.witness, prime, self.prime) == 1
         if '--verify' in sys.argv:
             for factor in self.factors:
                 if isinstance(factor, list):
                     factor = factor[0]
                 assert pow(self.witness, prime//factor, self.prime) != 1
-                output('.')
+                output('+')
+        print()
 
     @property
     def prime(self):
