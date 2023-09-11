@@ -1,4 +1,4 @@
-# `primes` [![wercker status](https://app.wercker.com/status/81bf2e1abe235c766b0e09a5e3c87c0d/s/ "wercker status")](https://app.wercker.com/project/bykey/81bf2e1abe235c766b0e09a5e3c87c0d)
+# `primes`
 
 This repo contains a single prime number and its [Pratt certificate][2]. The
 prime is JSON-encoded in the file `PRIME.json`. Previous primes can be found in

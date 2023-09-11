@@ -1,8 +1,0 @@
-box: python:3
-
-build:
-  steps:
-  - script:
-      name: test
-      code: |
-        python test.py < PRIME.json
