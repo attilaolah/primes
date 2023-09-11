@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package pratt;
+
+message List { repeated Certificate parts = 1; }
+
+message Certificate {
+  uint64 witness = 1;
+  repeated uint64 prime = 2; // little endian
+  repeated PrimeFactor factors = 3;
+}
+
+message PrimeFactor {
+  repeated uint64 prime = 1; // little endian
+  uint64 exponent = 2;       // default = 1
+}
