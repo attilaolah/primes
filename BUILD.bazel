@@ -1,9 +1,0 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
-
-rust_library(
-    name = "pratt",
-    srcs = [
-        "src/lib.rs",
-        "src/verify.rs",
-    ],
-)
