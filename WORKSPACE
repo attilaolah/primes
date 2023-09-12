@@ -14,13 +14,15 @@ rules_rust_dependencies()
 
 rust_register_toolchains()
 
-load("@rules_rust//proto/prost:repositories.bzl", "rust_prost_dependencies")
+load("@rules_rust//proto/protobuf:repositories.bzl", "rust_proto_protobuf_dependencies", "rust_proto_protobuf_register_toolchains")
 
-rust_prost_dependencies()
+rust_proto_protobuf_dependencies()
 
-load("@rules_rust//proto/prost:transitive_repositories.bzl", "rust_prost_transitive_repositories")
+rust_proto_protobuf_register_toolchains()
 
-rust_prost_transitive_repositories()
+load("@rules_rust//proto/protobuf:transitive_repositories.bzl", "rust_proto_protobuf_transitive_repositories")
+
+rust_proto_protobuf_transitive_repositories()
 
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 
@@ -32,35 +34,9 @@ crates_repository(
     name = "crate_index",
     cargo_lockfile = "//:Cargo.lock",
     lockfile = "//:cargo-bazel-lock.json",
-    annotations = {
-        "protoc-gen-prost": [crate.annotation(
-            gen_binaries = ["protoc-gen-prost"],
-        )],
-        "protoc-gen-tonic": [crate.annotation(
-            gen_binaries = ["protoc-gen-tonic"],
-        )],
-    },
-    packages = {
-        "prost": crate.spec(
-            version = "0.12",
-        ),
-        "prost-types": crate.spec(
-            version = "0.12",
-        ),
-        "protoc-gen-prost": crate.spec(
-            version = "0.2",
-        ),
-        "protoc-gen-tonic": crate.spec(
-            version = "0.3",
-        ),
-        "tonic": crate.spec(
-            version = "0.10",
-        ),
-    },
+    manifests = ["//:Cargo.toml"],
 )
 
 load("@crate_index//:defs.bzl", "crate_repositories")
 
 crate_repositories()
-
-register_toolchains("//toolchains:prost_toolchain")

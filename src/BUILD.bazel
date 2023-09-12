@@ -6,4 +6,5 @@ rust_library(
         "lib.rs",
         "verify.rs",
     ],
+    edition = "2021",
 )
