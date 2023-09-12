@@ -30,7 +30,6 @@ load("@rules_rust//crate_universe:defs.bzl", "crate", "crates_repository")
 
 crates_repository(
     name = "crate_index",
-    manifests = ["//:Cargo.toml"],
     cargo_lockfile = "//:Cargo.lock",
     lockfile = "//:cargo-bazel-lock.json",
     annotations = {
@@ -40,6 +39,23 @@ crates_repository(
         "protoc-gen-tonic": [crate.annotation(
             gen_binaries = ["protoc-gen-tonic"],
         )],
+    },
+    packages = {
+        "prost": crate.spec(
+            version = "0.12",
+        ),
+        "prost-types": crate.spec(
+            version = "0.12",
+        ),
+        "protoc-gen-prost": crate.spec(
+            version = "0.2",
+        ),
+        "protoc-gen-tonic": crate.spec(
+            version = "0.3",
+        ),
+        "tonic": crate.spec(
+            version = "0.10",
+        ),
     },
 )
 

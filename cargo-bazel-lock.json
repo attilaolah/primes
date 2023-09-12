@@ -1,5 +1,5 @@
 {
-  "checksum": "d8dce30f94491994e8dd9b1f5dfa1fd65eb57083d064c1fe0395be2a1136e559",
+  "checksum": "a684db5d872e3a5b4f953940a1d48e405a48bc671c6027e0a4dadf9a672ebe30",
   "crates": {
     "addr2line 0.21.0": {
       "name": "addr2line",
@@ -934,11 +934,11 @@
         "deps": {
           "common": [
             {
-              "id": "prost 0.11.9",
+              "id": "prost 0.12.0",
               "target": "prost"
             },
             {
-              "id": "prost-types 0.11.9",
+              "id": "prost-types 0.12.0",
               "target": "prost_types"
             },
             {
@@ -3387,7 +3387,6 @@
         ],
         "crate_features": {
           "common": [
-            "default",
             "prost-derive",
             "std"
           ],
@@ -3443,6 +3442,8 @@
         ],
         "crate_features": {
           "common": [
+            "default",
+            "prost-derive",
             "std"
           ],
           "selects": {}
@@ -3457,6 +3458,15 @@
           "selects": {}
         },
         "edition": "2021",
+        "proc_macro_deps": {
+          "common": [
+            {
+              "id": "prost-derive 0.12.0",
+              "target": "prost_derive"
+            }
+          ],
+          "selects": {}
+        },
         "version": "0.12.0"
       },
       "license": "Apache-2.0"
@@ -3616,6 +3626,61 @@
       },
       "license": "Apache-2.0"
     },
+    "prost-derive 0.12.0": {
+      "name": "prost-derive",
+      "version": "0.12.0",
+      "repository": {
+        "Http": {
+          "url": "https://crates.io/api/v1/crates/prost-derive/0.12.0/download",
+          "sha256": "56075c27b20ae524d00f247b8a4dc333e5784f889fe63099f8e626bc8d73486c"
+        }
+      },
+      "targets": [
+        {
+          "ProcMacro": {
+            "crate_name": "prost_derive",
+            "crate_root": "src/lib.rs",
+            "srcs": [
+              "**/*.rs"
+            ]
+          }
+        }
+      ],
+      "library_target_name": "prost_derive",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "anyhow 1.0.75",
+              "target": "anyhow"
+            },
+            {
+              "id": "itertools 0.10.5",
+              "target": "itertools"
+            },
+            {
+              "id": "proc-macro2 1.0.66",
+              "target": "proc_macro2"
+            },
+            {
+              "id": "quote 1.0.33",
+              "target": "quote"
+            },
+            {
+              "id": "syn 2.0.32",
+              "target": "syn"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.12.0"
+      },
+      "license": "Apache-2.0"
+    },
     "prost-types 0.11.9": {
       "name": "prost-types",
       "version": "0.11.9",
@@ -3623,6 +3688,45 @@
         "Http": {
           "url": "https://crates.io/api/v1/crates/prost-types/0.11.9/download",
           "sha256": "213622a1460818959ac1181aaeb2dc9c7f63df720db7d788b3e24eacd1983e13"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "prost_types",
+            "crate_root": "src/lib.rs",
+            "srcs": [
+              "**/*.rs"
+            ]
+          }
+        }
+      ],
+      "library_target_name": "prost_types",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "prost 0.11.9",
+              "target": "prost"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.11.9"
+      },
+      "license": "Apache-2.0"
+    },
+    "prost-types 0.12.0": {
+      "name": "prost-types",
+      "version": "0.12.0",
+      "repository": {
+        "Http": {
+          "url": "https://crates.io/api/v1/crates/prost-types/0.12.0/download",
+          "sha256": "cebe0a918c97f86c217b0f76fd754e966f8b9f41595095cf7d74cb4e59d730f6"
         }
       },
       "targets": [
@@ -3651,14 +3755,14 @@
         "deps": {
           "common": [
             {
-              "id": "prost 0.11.9",
+              "id": "prost 0.12.0",
               "target": "prost"
             }
           ],
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.11.9"
+        "version": "0.12.0"
       },
       "license": "Apache-2.0"
     },
