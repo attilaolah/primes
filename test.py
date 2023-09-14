@@ -1,8 +1,7 @@
 """Verify a single Pratt certificate."""
 import json
+import math
 import sys
-
-from fractions import gcd
 
 
 class _Single(tuple):
@@ -16,7 +15,7 @@ class _Single(tuple):
         assert isinstance(self.witness, int)
         assert self.prime > 2
         assert self.witness > 1
-        assert gcd(self.prime, self.witness) == 1
+        assert math.gcd(self.prime, self.witness) == 1
         for factor in self.factors:
             if isinstance(factor, int):
                 prime *= factor
