@@ -58,7 +58,5 @@ A quick check of the certificate format can be done by running `python test.py
 < PRIME.json`. To run a full test (which is way slower than the short check),
 run `python test.py --verify < PRIME.json`.
 
-Note that Python 3 will run the tests somewhat faster than Python 2.
-
 [1]: //en.wikipedia.org/wiki/Primality_certificate
 [2]: //en.wikipedia.org/wiki/Primality_certificate#Pratt_certificates
