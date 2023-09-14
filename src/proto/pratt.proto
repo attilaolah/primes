@@ -5,7 +5,7 @@ package pratt;
 message List { repeated Certificate parts = 1; }
 
 message Certificate {
-  uint64 witness = 1;
+  uint64 witness = 1;        // default = 2
   repeated uint64 prime = 2; // little endian
   repeated PrimeFactor factors = 3;
 }
