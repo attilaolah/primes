@@ -27,15 +27,15 @@ class _Single(tuple):
             assert exp > 1
             prime *= factor**exp
         assert self.prime == prime+1
-        output('#')
         assert pow(self.witness, prime, self.prime) == 1
+        print('OK')
         if '--verify' in sys.argv:
-            for factor in self.factors:
+            for i, factor in enumerate(self.factors, 1):
                 if isinstance(factor, list):
                     factor = factor[0]
+                print(f'> PART {i}/{len(self.factors)}: ', end='')
                 assert pow(self.witness, prime//factor, self.prime) != 1
-                output('+')
-        print()
+                print('OK')
 
     @property
     def prime(self):
@@ -66,7 +66,8 @@ class _Pratt(list):
         primes = set()
         assert len(self) > 0
         # First pass: verify all parts
-        for part in self:
+        for i, part in enumerate(self, 1):
+            print(f'CHECK {i}/{len(self)}: ', end='')
             part.verify()
             assert part.prime not in primes
             primes.add(part.prime)
@@ -77,12 +78,6 @@ class _Pratt(list):
                     factor = factor[0]
                 if factor != 2:
                     assert factor in primes
-
-
-def output(text):
-    """Print without a buffer."""
-    sys.stdout.write(text)
-    sys.stdout.flush()
 
 
 if __name__ == '__main__':
