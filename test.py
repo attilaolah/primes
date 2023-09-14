@@ -86,4 +86,5 @@ def output(text):
 
 
 if __name__ == '__main__':
+    sys.set_int_max_str_digits(10000)
     _Pratt(json.load(sys.stdin)).verify()
