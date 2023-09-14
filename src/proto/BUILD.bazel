@@ -1,0 +1,13 @@
+load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@rules_rust//proto/protobuf:defs.bzl", "rust_proto_library")
+
+proto_library(
+    name = "pratt",
+    srcs = ["pratt.proto"],
+    visibility = ["//:__pkg__"],
+)
+
+rust_proto_library(
+    name = "pratt_rs",
+    deps = [":pratt"],
+)

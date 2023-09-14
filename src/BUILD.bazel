@@ -1,0 +1,10 @@
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+rust_library(
+    name = "pratt",
+    srcs = [
+        "lib.rs",
+        "verify.rs",
+    ],
+    edition = "2021",
+)
