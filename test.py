@@ -1,8 +1,7 @@
 """Verify a single Pratt certificate."""
 import json
+import math
 import sys
-
-from fractions import gcd
 
 
 class _Single(tuple):
@@ -16,7 +15,7 @@ class _Single(tuple):
         assert isinstance(self.witness, int)
         assert self.prime > 2
         assert self.witness > 1
-        assert gcd(self.prime, self.witness) == 1
+        assert math.gcd(self.prime, self.witness) == 1
         for factor in self.factors:
             if isinstance(factor, int):
                 prime *= factor
@@ -28,15 +27,15 @@ class _Single(tuple):
             assert exp > 1
             prime *= factor**exp
         assert self.prime == prime+1
-        output('#')
         assert pow(self.witness, prime, self.prime) == 1
+        print('OK')
         if '--verify' in sys.argv:
-            for factor in self.factors:
+            for i, factor in enumerate(self.factors, 1):
                 if isinstance(factor, list):
                     factor = factor[0]
+                print(f'> PART {i}/{len(self.factors)}: ', end='')
                 assert pow(self.witness, prime//factor, self.prime) != 1
-                output('+')
-        print()
+                print('OK')
 
     @property
     def prime(self):
@@ -67,7 +66,8 @@ class _Pratt(list):
         primes = set()
         assert len(self) > 0
         # First pass: verify all parts
-        for part in self:
+        for i, part in enumerate(self, 1):
+            print(f'CHECK {i}/{len(self)}: ', end='')
             part.verify()
             assert part.prime not in primes
             primes.add(part.prime)
@@ -80,11 +80,6 @@ class _Pratt(list):
                     assert factor in primes
 
 
-def output(text):
-    """Print without a buffer."""
-    sys.stdout.write(text)
-    sys.stdout.flush()
-
-
 if __name__ == '__main__':
+    sys.set_int_max_str_digits(10000)
     _Pratt(json.load(sys.stdin)).verify()
