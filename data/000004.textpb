@@ -1,0 +1,5 @@
+parts {
+  prime: 11
+  factors { prime: 2 }
+  factors { prime: 5 }
+}

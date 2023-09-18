@@ -1,0 +1,6 @@
+parts {
+  prime: 7
+  witness: 3
+  factors { prime: 2 }
+  factors { prime: 3 }
+}

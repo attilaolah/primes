@@ -1,0 +1,4 @@
+parts {
+  prime: 5
+  factors { prime: 2 exponent: 2 }
+}

@@ -1,0 +1,4 @@
+parts {
+  prime: 3
+  factors { prime: 2 }
+}
