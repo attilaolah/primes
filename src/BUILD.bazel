@@ -7,4 +7,5 @@ rust_library(
         "verify.rs",
     ],
     edition = "2021",
+    deps = ["//src/proto:pratt_rs"],
 )
