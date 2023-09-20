@@ -9,6 +9,6 @@ proto_library(
 
 rust_proto_library(
     name = "pratt_rs",
-    deps = [":pratt"],
     visibility = ["//src:__pkg__"],
+    deps = [":pratt"],
 )

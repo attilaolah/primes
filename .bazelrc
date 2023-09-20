@@ -1,0 +1,6 @@
+# Use Clang.
+build --action_env="CC=clang"
+common --incompatible_strict_action_env
+
+# Clang shipped by Nix seems to require the `-xc++` flag to access the C++ standard library headers.
+build --cxxopt=-xc++ --host_cxxopt=-xc++

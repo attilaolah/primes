@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-package pratt;
-
 message List { repeated Certificate parts = 1; }
 
 message Certificate {
