@@ -15,6 +15,23 @@ const Factor = struct {
     exp: c_ulong,
 };
 
+const FactorWorkerShared = struct {
+    mutex: std.Thread.Mutex = .{},
+    next_index: usize = 0,
+    completed: usize = 0,
+    failed: bool = false,
+    failed_code: u8 = 0,
+    failed_index: usize = 0,
+};
+
+const FactorWorkerCtx = struct {
+    shared: *FactorWorkerShared,
+    factors: []const Factor,
+    prime_dec: []const u8,
+    witness_dec: []const u8,
+    n_minus_one_dec: []const u8,
+};
+
 const Cert = struct {
     id: []const u8,
     prime: []const u8,
@@ -80,6 +97,15 @@ fn sha256HexOfBytes(arena: std.mem.Allocator, bytes: []const u8) ![]const u8 {
 
 fn sha256HexOfDecimal(arena: std.mem.Allocator, dec: []const u8) ![]const u8 {
     return sha256HexOfBytes(arena, dec);
+}
+
+fn mpzToOwnedDecimal(arena: std.mem.Allocator, n: *const c.mpz_t) ![]const u8 {
+    const approx_digits = c.mpz_sizeinbase(n, 10);
+    const tmp = try arena.alloc(u8, approx_digits + 3);
+    const p = c.mpz_get_str(@ptrCast(tmp.ptr), 10, n) orelse return error.OutOfMemory;
+    const z: [*:0]u8 = @ptrCast(p);
+    const s = std.mem.sliceTo(z, 0);
+    return arena.dupe(u8, s);
 }
 
 fn parseCertBytes(arena: std.mem.Allocator, id: []const u8, bytes: []const u8) !Cert {
@@ -277,15 +303,94 @@ fn verifyMath(cert: Cert) !void {
     c.mpz_powm(&fermat, &witness, &n_minus_one, &prime);
     if (c.mpz_cmp(&fermat, &one) != 0) return fail("witness^(prime-1) mod prime != 1", .{});
 
-    factor_index = 0;
-    while (factor_index < cert.factors.len) : (factor_index += 1) {
-        const f = cert.factors[factor_index];
+    const prime_dec = try mpzToOwnedDecimal(std.heap.c_allocator, &prime);
+    defer std.heap.c_allocator.free(prime_dec);
+    const witness_dec = try mpzToOwnedDecimal(std.heap.c_allocator, &witness);
+    defer std.heap.c_allocator.free(witness_dec);
+    const n_minus_one_dec = try mpzToOwnedDecimal(std.heap.c_allocator, &n_minus_one);
+    defer std.heap.c_allocator.free(n_minus_one_dec);
+
+    var shared = FactorWorkerShared{};
+    const cpu_count = std.Thread.getCpuCount() catch 1;
+    const thread_count = @max(@as(usize, 1), @min(cpu_count, cert.factors.len));
+
+    var workers = try std.heap.c_allocator.alloc(std.Thread, thread_count);
+    defer std.heap.c_allocator.free(workers);
+    var ctxs = try std.heap.c_allocator.alloc(FactorWorkerCtx, thread_count);
+    defer std.heap.c_allocator.free(ctxs);
+
+    var t: usize = 0;
+    while (t < thread_count) : (t += 1) {
+        ctxs[t] = .{
+            .shared = &shared,
+            .factors = cert.factors,
+            .prime_dec = prime_dec,
+            .witness_dec = witness_dec,
+            .n_minus_one_dec = n_minus_one_dec,
+        };
+        workers[t] = try std.Thread.spawn(.{}, factorWorkerMain, .{&ctxs[t]});
+    }
+    t = 0;
+    while (t < thread_count) : (t += 1) workers[t].join();
+
+    if (shared.failed) {
+        switch (shared.failed_code) {
+            1 => return fail("factor does not divide prime-1 (factor #{d})", .{shared.failed_index + 1}),
+            2 => return fail("witness^((prime-1)/factor) mod prime == 1 (factor #{d})", .{shared.failed_index + 1}),
+            else => return fail("factor worker failed (factor #{d})", .{shared.failed_index + 1}),
+        }
+    }
+}
+
+fn factorWorkerMain(ctx: *FactorWorkerCtx) void {
+    var prime: c.mpz_t = undefined;
+    if (mpzInitSetStrDec(ctx.prime_dec, &prime)) |_| {} else |_| {
+        setFactorFailure(ctx.shared, 3, 0);
+        return;
+    }
+    defer c.mpz_clear(&prime);
+
+    var witness: c.mpz_t = undefined;
+    if (mpzInitSetStrDec(ctx.witness_dec, &witness)) |_| {} else |_| {
+        setFactorFailure(ctx.shared, 3, 0);
+        return;
+    }
+    defer c.mpz_clear(&witness);
+
+    var n_minus_one: c.mpz_t = undefined;
+    if (mpzInitSetStrDec(ctx.n_minus_one_dec, &n_minus_one)) |_| {} else |_| {
+        setFactorFailure(ctx.shared, 3, 0);
+        return;
+    }
+    defer c.mpz_clear(&n_minus_one);
+
+    var one: c.mpz_t = undefined;
+    c.mpz_init_set_ui(&one, 1);
+    defer c.mpz_clear(&one);
+
+    while (true) {
+        var idx: usize = 0;
+        {
+            ctx.shared.mutex.lock();
+            defer ctx.shared.mutex.unlock();
+            if (ctx.shared.failed or ctx.shared.next_index >= ctx.factors.len) break;
+            idx = ctx.shared.next_index;
+            ctx.shared.next_index += 1;
+        }
+
+        const f = ctx.factors[idx];
 
         var base: c.mpz_t = undefined;
-        try mpzInitSetStrDec(f.base, &base);
+        if (mpzInitSetStrDec(f.base, &base)) |_| {} else |_| {
+            setFactorFailure(ctx.shared, 3, idx);
+            break;
+        }
         defer c.mpz_clear(&base);
 
-        if (c.mpz_divisible_p(&n_minus_one, &base) == 0) return fail("factor does not divide prime-1", .{});
+        if (c.mpz_divisible_p(&n_minus_one, &base) == 0) {
+            setFactorFailure(ctx.shared, 1, idx);
+            break;
+        }
 
         var q: c.mpz_t = undefined;
         c.mpz_init(&q);
@@ -297,8 +402,27 @@ fn verifyMath(cert: Cert) !void {
         defer c.mpz_clear(&check);
         c.mpz_powm(&check, &witness, &q, &prime);
 
-        if (c.mpz_cmp(&check, &one) == 0) return fail("witness^((prime-1)/factor) mod prime == 1", .{});
-        std.debug.print("  FACTOR {d}/{d}\n", .{ factor_index + 1, cert.factors.len });
+        if (c.mpz_cmp(&check, &one) == 0) {
+            setFactorFailure(ctx.shared, 2, idx);
+            break;
+        }
+
+        var done: usize = 0;
+        ctx.shared.mutex.lock();
+        ctx.shared.completed += 1;
+        done = ctx.shared.completed;
+        ctx.shared.mutex.unlock();
+        std.debug.print("  FACTOR {d}/{d}\n", .{ done, ctx.factors.len });
+    }
+}
+
+fn setFactorFailure(shared: *FactorWorkerShared, code: u8, index: usize) void {
+    shared.mutex.lock();
+    defer shared.mutex.unlock();
+    if (!shared.failed) {
+        shared.failed = true;
+        shared.failed_code = code;
+        shared.failed_index = index;
     }
 }
 
