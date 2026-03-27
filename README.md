@@ -54,9 +54,13 @@ Pull requests changing the prime number to a bigger one are welcome.
 
 ## Tests
 
-A quick check of the certificate format can be done by running `python -u
-test.py < PRIME.json`. To run a full test (which is way slower than the short
-check), run `python test.py --verify < PRIME.json`.
+A quick check of the certificate can be done by running:
+
+`nix run .#verify`
+
+To run a full check (which is way slower than the short check), run:
+
+`nix run .#verify -- --verify`
 
 [1]: //en.wikipedia.org/wiki/Primality_certificate
 [2]: //en.wikipedia.org/wiki/Primality_certificate#Pratt_certificates
