@@ -203,8 +203,21 @@ fn ensureDirectDependenciesExist(
     }
 }
 
+fn summarizeDecimal(value: []const u8) struct { head: []const u8, truncated: bool, digits: usize } {
+    const max_head = 20;
+    if (value.len <= max_head) {
+        return .{ .head = value, .truncated = false, .digits = value.len };
+    }
+    return .{ .head = value[0..max_head], .truncated = true, .digits = value.len };
+}
+
 fn verifyMath(cert: Cert) !void {
-    std.debug.print("CHECK {s}\n", .{cert.prime});
+    const s = summarizeDecimal(cert.prime);
+    if (s.truncated) {
+        std.debug.print("CHECK {s}... ({d} digits)\n", .{ s.head, s.digits });
+    } else {
+        std.debug.print("CHECK {s} ({d} digits)\n", .{ s.head, s.digits });
+    }
 
     var prime: c.mpz_t = undefined;
     try mpzInitSetStrDec(cert.prime, &prime);
