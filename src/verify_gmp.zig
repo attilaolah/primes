@@ -81,6 +81,36 @@ fn mpzToOwnedDecimal(allocator: std.mem.Allocator, n: *const c.mpz_t) ![]u8 {
     return out;
 }
 
+const PartEntry = struct {
+    part: std.json.Array,
+    prime_key: []u8,
+};
+
+fn decimalLessThan(a: []const u8, b: []const u8) bool {
+    if (a.len != b.len) return a.len < b.len;
+    return std.mem.order(u8, a, b) == .lt;
+}
+
+fn sortPartEntries(entries: []PartEntry) void {
+    var i: usize = 1;
+    while (i < entries.len) : (i += 1) {
+        var j = i;
+        while (j > 0 and decimalLessThan(entries[j].prime_key, entries[j - 1].prime_key)) : (j -= 1) {
+            std.mem.swap(PartEntry, &entries[j], &entries[j - 1]);
+        }
+    }
+}
+
+fn partPrimeKey(allocator: std.mem.Allocator, part: std.json.Array) ![]u8 {
+    if (part.items.len < 1) return error.InvalidCertificate;
+
+    var prime: c.mpz_t = undefined;
+    try parseMpz(allocator, part.items[0], &prime);
+    defer c.mpz_clear(&prime);
+
+    return mpzToOwnedDecimal(allocator, &prime);
+}
+
 fn verifyPart(
     allocator: std.mem.Allocator,
     part: std.json.Array,
@@ -252,20 +282,34 @@ pub fn main() !void {
         seen_primes.deinit();
     }
 
+    var ordered_parts = std.array_list.Managed(PartEntry).init(gpa);
+    defer {
+        for (ordered_parts.items) |entry| gpa.free(entry.prime_key);
+        ordered_parts.deinit();
+    }
+
     var i: usize = 0;
     while (i < root.items.len) : (i += 1) {
         const part = try parsePartArray(root.items[i]);
-        try verifyPart(gpa, part, full_verify, i + 1, root.items.len);
+        try ordered_parts.append(.{
+            .part = part,
+            .prime_key = try partPrimeKey(gpa, part),
+        });
+    }
+    sortPartEntries(ordered_parts.items);
 
-        var prime: c.mpz_t = undefined;
-        try parseMpz(gpa, part.items[0], &prime);
-        defer c.mpz_clear(&prime);
+    i = 0;
+    while (i < ordered_parts.items.len) : (i += 1) {
+        const entry = ordered_parts.items[i];
+        try verifyPart(gpa, entry.part, full_verify, i + 1, root.items.len);
 
-        const key = try mpzToOwnedDecimal(gpa, &prime);
+        const key = try gpa.dupe(u8, entry.prime_key);
         errdefer gpa.free(key);
-
         const found = try seen_primes.getOrPut(key);
-        if (found.found_existing) return fail("duplicate part prime", .{});
+        if (found.found_existing) {
+            gpa.free(key);
+            return fail("duplicate part prime", .{});
+        }
         found.key_ptr.* = key;
     }
 
@@ -274,8 +318,8 @@ pub fn main() !void {
     defer c.mpz_clear(&two);
 
     i = 0;
-    while (i < root.items.len) : (i += 1) {
-        const part = try parsePartArray(root.items[i]);
+    while (i < ordered_parts.items.len) : (i += 1) {
+        const part = ordered_parts.items[i].part;
 
         var j: usize = 2;
         while (j < part.items.len) : (j += 1) {
