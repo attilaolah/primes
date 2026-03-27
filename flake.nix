@@ -36,7 +36,7 @@
           runHook preBuild
           export ZIG_GLOBAL_CACHE_DIR="$TMPDIR/zig-global-cache"
           export ZIG_LOCAL_CACHE_DIR="$TMPDIR/zig-local-cache"
-          zig build-exe src/verify_gmp.zig \
+          zig build-exe src/verify.zig \
             -O ReleaseSafe \
             -I ${pkgs.gmp.dev}/include \
             -L ${pkgs.gmp.out}/lib \

@@ -257,7 +257,7 @@ pub fn main() !void {
         if (std.mem.eql(u8, arg, "--verify")) {
             full_verify = true;
         } else if (std.mem.startsWith(u8, arg, "--")) {
-            std.debug.print("usage: zig run src/verify_gmp.zig -lc -lgmp -- [--verify] [path-to-json]\n", .{});
+            std.debug.print("usage: zig run src/verify.zig -lc -lgmp -- [--verify] [path-to-json]\n", .{});
             return;
         } else {
             input_path = arg;
