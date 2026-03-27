@@ -206,9 +206,7 @@ fn verifyPart(
             }
 
             const factor_index = idx - 1;
-            if (factor_count <= 20 or factor_index == 1 or factor_index == factor_count or factor_index % 100 == 0) {
-                std.debug.print("  FACTOR {d}/{d}\n", .{ factor_index, factor_count });
-            }
+            std.debug.print("  FACTOR {d}/{d}\n", .{ factor_index, factor_count });
         }
     }
 }
