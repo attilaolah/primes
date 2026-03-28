@@ -103,6 +103,7 @@ fn sha256HexOfDecimal(arena: std.mem.Allocator, dec: []const u8) ![]const u8 {
 fn mpzToOwnedDecimal(arena: std.mem.Allocator, n: *const c.mpz_t) ![]const u8 {
     const approx_digits = c.mpz_sizeinbase(n, 10);
     const tmp = try arena.alloc(u8, approx_digits + 3);
+    defer arena.free(tmp);
     const p = c.mpz_get_str(@ptrCast(tmp.ptr), 10, n) orelse return error.OutOfMemory;
     const z: [*:0]u8 = @ptrCast(p);
     const s = std.mem.sliceTo(z, 0);
@@ -330,6 +331,7 @@ fn verifyMath(cert: Cert) !void {
     defer std.heap.c_allocator.free(ctxs);
 
     var t: usize = 0;
+    var spawned_count: usize = 0;
     while (t < thread_count) : (t += 1) {
         ctxs[t] = .{
             .shared = &shared,
@@ -338,10 +340,15 @@ fn verifyMath(cert: Cert) !void {
             .witness_dec = witness_dec,
             .n_minus_one_dec = n_minus_one_dec,
         };
-        workers[t] = try std.Thread.spawn(.{}, factorWorkerMain, .{&ctxs[t]});
+        workers[t] = std.Thread.spawn(.{}, factorWorkerMain, .{&ctxs[t]}) catch |err| {
+            var i: usize = 0;
+            while (i < spawned_count) : (i += 1) workers[i].join();
+            return err;
+        };
+        spawned_count += 1;
     }
     t = 0;
-    while (t < thread_count) : (t += 1) workers[t].join();
+    while (t < spawned_count) : (t += 1) workers[t].join();
 
     if (shared.failed) {
         switch (shared.failed_code) {
