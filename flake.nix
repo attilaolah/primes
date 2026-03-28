@@ -22,7 +22,13 @@
       verifyPkg = pkgs.stdenv.mkDerivation {
         pname = "verify";
         version = "0.1.0";
-        src = self;
+        src = let
+          inherit (nixpkgs.lib) fileset;
+        in
+          fileset.toSource {
+            root = ./.;
+            fileset = fileset.unions [./src];
+          };
 
         nativeBuildInputs = [
           pkgs.zig
