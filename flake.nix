@@ -70,5 +70,25 @@
         program = verifyProgram;
       };
     });
+
+    checks = forAllSystems (system: let
+      pkgs = import nixpkgs {inherit system;};
+      verify = self.packages.${system}.verify;
+    in {
+      verify-small = pkgs.runCommand "verify-small" {} ''
+        id=$(printf "3" | sha256sum | cut -c1-16)
+
+        mkdir -p data
+        cat > "data/$id" <<EOF
+        V 1
+        P 3
+        W 2
+        F 2
+        EOF
+
+        ${verify}/bin/verify "data/$id"
+        touch "$out"
+      '';
+    });
   };
 }
