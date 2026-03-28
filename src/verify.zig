@@ -7,6 +7,7 @@ const c = @cImport({
 const DATA_DIR = "data";
 const TIP_PATH = "TIP";
 const MIN_ID_LEN: usize = 16;
+const MAX_CERT_SIZE: usize = 10 * 1024 * 1024;
 
 const VerifyError = error{InvalidCertificate};
 
@@ -463,7 +464,10 @@ pub fn main() !void {
         return fail("invalid certificate id from path: {s}", .{cert_id});
     }
 
-    const bytes = try std.fs.cwd().readFileAlloc(arena, cert_path, std.math.maxInt(usize));
+    const bytes = try std.fs.cwd().readFileAlloc(arena, cert_path, MAX_CERT_SIZE);
+    if (bytes.len == MAX_CERT_SIZE) {
+        return fail("{s}: certificate file is too large", .{cert_id});
+    }
     const cert = try parseCertBytes(arena, cert_id, bytes);
 
     const prime_hash = try sha256HexOfDecimal(arena, cert.prime);
