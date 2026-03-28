@@ -4,10 +4,10 @@ const c = @cImport({
     @cInclude("gmp.h");
 });
 
-const DATA_DIR = "data";
-const TIP_PATH = "TIP";
-const MIN_ID_LEN: usize = 16;
-const MAX_CERT_SIZE: usize = 10 * 1024 * 1024;
+const data_dir = "data";
+const tip_path = "TIP";
+const min_id_len: usize = 16;
+const max_cert_size: usize = 10 * 1024 * 1024;
 
 const VerifyError = error{InvalidCertificate};
 
@@ -192,14 +192,14 @@ fn parseCertBytes(arena: std.mem.Allocator, id: []const u8, bytes: []const u8) !
 fn readDataIds(arena: std.mem.Allocator) !std.array_list.Managed([]const u8) {
     var ids = std.array_list.Managed([]const u8).init(arena);
 
-    var data_dir = try std.fs.cwd().openDir(DATA_DIR, .{ .iterate = true });
-    defer data_dir.close();
+    var data_dir_handle = try std.fs.cwd().openDir(data_dir, .{ .iterate = true });
+    defer data_dir_handle.close();
 
-    var iter = data_dir.iterate();
+    var iter = data_dir_handle.iterate();
     while (try iter.next()) |entry| {
         if (entry.kind != .file) continue;
         const id = entry.name;
-        if (id.len < MIN_ID_LEN or id.len > 64 or !isLowerHex(id)) {
+        if (id.len < min_id_len or id.len > 64 or !isLowerHex(id)) {
             return fail("invalid certificate filename in data/: {s}", .{id});
         }
         try ids.append(try arena.dupe(u8, id));
@@ -432,15 +432,15 @@ fn resolveInputPath(arena: std.mem.Allocator, arg: ?[]const u8) ![]const u8 {
         if (std.mem.indexOfScalar(u8, a, '/')) |_| {
             return arena.dupe(u8, a);
         }
-        return std.fs.path.join(arena, &[_][]const u8{ DATA_DIR, a });
+        return std.fs.path.join(arena, &[_][]const u8{ data_dir, a });
     }
 
-    const tip_raw = try std.fs.cwd().readFileAlloc(arena, TIP_PATH, 4096);
+    const tip_raw = try std.fs.cwd().readFileAlloc(arena, tip_path, 4096);
     const tip = std.mem.trim(u8, tip_raw, " \t\r\n");
-    if (tip.len < MIN_ID_LEN or tip.len > 64 or !isLowerHex(tip)) {
+    if (tip.len < min_id_len or tip.len > 64 or !isLowerHex(tip)) {
         return fail("invalid TIP content", .{});
     }
-    return std.fs.path.join(arena, &[_][]const u8{ DATA_DIR, tip });
+    return std.fs.path.join(arena, &[_][]const u8{ data_dir, tip });
 }
 
 pub fn main() !void {
@@ -460,12 +460,12 @@ pub fn main() !void {
 
     const cert_path = try resolveInputPath(arena, arg1);
     const cert_id = std.fs.path.basename(cert_path);
-    if (cert_id.len < MIN_ID_LEN or cert_id.len > 64 or !isLowerHex(cert_id)) {
+    if (cert_id.len < min_id_len or cert_id.len > 64 or !isLowerHex(cert_id)) {
         return fail("invalid certificate id from path: {s}", .{cert_id});
     }
 
-    const bytes = try std.fs.cwd().readFileAlloc(arena, cert_path, MAX_CERT_SIZE);
-    if (bytes.len == MAX_CERT_SIZE) {
+    const bytes = try std.fs.cwd().readFileAlloc(arena, cert_path, max_cert_size);
+    if (bytes.len == max_cert_size) {
         return fail("{s}: certificate file is too large", .{cert_id});
     }
     const cert = try parseCertBytes(arena, cert_id, bytes);
