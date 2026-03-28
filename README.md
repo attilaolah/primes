@@ -1,50 +1,35 @@
 # `primes`
 
-This repo contains a single prime number and its [Pratt certificate][2]. The
-prime is JSON-encoded in the file `PRIME.json`. Previous primes can be found in
-the git history.
+This repo stores Pratt certificates for primes in `data/`, with one certificate
+per file.
 
 
-## Pratt Certificates
+## Certificate Format
 
-Pratt certificates are JSON-encoded and pretty-printed. The following is an
-example of a valid certificate for 1021, compacted for readability.
+Certificates are plain text files with canonical line format:
 
-```json
-[
-  [1021, 10, 17, 5, 3, [2, 2]],
-  [17, 3, [2, 4]],
-  [5, 2, [2, 2]],
-  [3, 2, 2]
-]
+```text
+V 1
+P <prime>
+W <witness>
+F <factor>
+F <factor>^<exponent>
+...
 ```
 
-A valid certificate is an array of certificate parts. Each part is itself also
-an array, containing at least three elements:
+Rules:
 
-1. the prime
-2. the witness
-3. one or more factors
+1. Exactly one `P` and one `W` line.
+2. At least one `F` line.
+3. Decimal integers only (canonical form, no leading zeroes).
+4. Factors must be strictly ascending by factor base.
+5. File must end with a trailing newline.
 
-In the above example, the first certificate part is `[1021, 10, 17, 5, 3, [2,
-2]]`. `1021` is the prime, `10` is the witness, the rest are the factors.
+Each file name is a lowercase hex prefix (min length 16) of:
 
-Each factor can be either a number, or a list of two numbers, in which case the
-second number is the exponent. In the first part of the above example, `17`,
-`5` and `3` are simple factors, and `[2, 2]` is a factor representing 2².
+`sha256(<prime-in-base-10>)`
 
-Every factor of every part of the chain must also have its own certificate,
-except for the number 2, which is a known prime.
-
-The above example could be written in plain text, like this:
-
-```
-1021 (witness: 10) = 17·5·3·2²+1;
-  17 (witness:  3) = 2⁴+1;
-   5 (witness:  2) = 2²+1;
-   3 (witness:  2) = 2+1;
-   2 is prime.
-```
+`TIP` contains the file id of the current top prime certificate.
 
 
 ## Pull Requests
@@ -52,11 +37,26 @@ The above example could be written in plain text, like this:
 Pull requests changing the prime number to a bigger one are welcome.
 
 
-## Tests
+## Verify
 
-A quick check of the certificate format can be done by running `python -u
-test.py < PRIME.json`. To run a full test (which is way slower than the short
-check), run `python test.py --verify < PRIME.json`.
+Verify the certificate pointed to by `TIP`:
+
+`nix run .#verify`
+
+Verify a specific certificate id:
+
+`nix run .#verify -- <id>`
+
+Verify a specific file path:
+
+`nix run .#verify -- data/<id>`
+
+What verification checks:
+
+1. Certificate format and canonical constraints.
+2. File id matches `sha256(prime)` prefix.
+3. Direct dependency presence in `data/` for every factor prime except `2`.
+4. Full Pratt math validation for the selected certificate.
 
 [1]: //en.wikipedia.org/wiki/Primality_certificate
 [2]: //en.wikipedia.org/wiki/Primality_certificate#Pratt_certificates
