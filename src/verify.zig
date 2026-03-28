@@ -345,24 +345,24 @@ fn verifyMath(cert: Cert) !void {
 
 fn factorWorkerMain(ctx: *FactorWorkerCtx) void {
     var prime: c.mpz_t = undefined;
-    if (mpzInitSetStrDec(ctx.prime_dec, &prime)) |_| {} else |_| {
+    mpzInitSetStrDec(ctx.prime_dec, &prime) catch {
         setFactorFailure(ctx.shared, 3, 0);
         return;
-    }
+    };
     defer c.mpz_clear(&prime);
 
     var witness: c.mpz_t = undefined;
-    if (mpzInitSetStrDec(ctx.witness_dec, &witness)) |_| {} else |_| {
+    mpzInitSetStrDec(ctx.witness_dec, &witness) catch {
         setFactorFailure(ctx.shared, 3, 0);
         return;
-    }
+    };
     defer c.mpz_clear(&witness);
 
     var n_minus_one: c.mpz_t = undefined;
-    if (mpzInitSetStrDec(ctx.n_minus_one_dec, &n_minus_one)) |_| {} else |_| {
+    mpzInitSetStrDec(ctx.n_minus_one_dec, &n_minus_one) catch {
         setFactorFailure(ctx.shared, 3, 0);
         return;
-    }
+    };
     defer c.mpz_clear(&n_minus_one);
 
     var one: c.mpz_t = undefined;
