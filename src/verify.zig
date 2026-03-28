@@ -396,10 +396,10 @@ fn factorWorkerMain(ctx: *FactorWorkerCtx) void {
 
         // SAFETY: GMP fully initializes mpz_t via mpzInitSetStrDec before any read.
         var base: c.mpz_t = undefined;
-        if (mpzInitSetStrDec(f.base, &base)) |_| {} else |_| {
+        mpzInitSetStrDec(f.base, &base) catch {
             setFactorFailure(ctx.shared, 3, idx);
             break;
-        }
+        };
         defer c.mpz_clear(&base);
 
         if (c.mpz_divisible_p(&n_minus_one, &base) == 0) {
