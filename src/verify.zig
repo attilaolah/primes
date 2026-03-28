@@ -480,8 +480,8 @@ pub fn main() !void {
         return fail("invalid certificate id from path: {s}", .{cert_id});
     }
 
-    const bytes = try std.fs.cwd().readFileAlloc(arena, cert_path, max_cert_size);
-    if (bytes.len == max_cert_size) {
+    const bytes = try std.fs.cwd().readFileAlloc(arena, cert_path, max_cert_size + 1);
+    if (bytes.len > max_cert_size) {
         return fail("{s}: certificate file is too large", .{cert_id});
     }
     const cert = try parseCertBytes(arena, cert_id, bytes);
