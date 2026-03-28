@@ -246,10 +246,12 @@ fn verifyMath(cert: Cert) !void {
         std.debug.print("CHECK {s} ({d} digits)\n", .{ s.head, s.digits });
     }
 
+    // SAFETY: GMP fully initializes mpz_t via mpzInitSetStrDec before any read.
     var prime: c.mpz_t = undefined;
     try mpzInitSetStrDec(cert.prime, &prime);
     defer c.mpz_clear(&prime);
 
+    // SAFETY: GMP fully initializes mpz_t via mpzInitSetStrDec before any read.
     var witness: c.mpz_t = undefined;
     try mpzInitSetStrDec(cert.witness, &witness);
     defer c.mpz_clear(&witness);
@@ -257,16 +259,19 @@ fn verifyMath(cert: Cert) !void {
     if (c.mpz_cmp_ui(&prime, 2) <= 0) return fail("prime must be > 2", .{});
     if (c.mpz_cmp_ui(&witness, 1) <= 0) return fail("witness must be > 1", .{});
 
+    // SAFETY: GMP fully initializes mpz_t via mpz_init before any read.
     var gcd: c.mpz_t = undefined;
     c.mpz_init(&gcd);
     defer c.mpz_clear(&gcd);
     c.mpz_gcd(&gcd, &prime, &witness);
     if (c.mpz_cmp_ui(&gcd, 1) != 0) return fail("gcd(prime, witness) != 1", .{});
 
+    // SAFETY: GMP fully initializes mpz_t via mpz_init_set_ui before any read.
     var n_minus_one: c.mpz_t = undefined;
     c.mpz_init_set_ui(&n_minus_one, 1);
     defer c.mpz_clear(&n_minus_one);
 
+    // SAFETY: GMP fully initializes mpz_t via mpz_init_set_ui before any read.
     var one: c.mpz_t = undefined;
     c.mpz_init_set_ui(&one, 1);
     defer c.mpz_clear(&one);
@@ -275,12 +280,14 @@ fn verifyMath(cert: Cert) !void {
     while (factor_index < cert.factors.len) : (factor_index += 1) {
         const f = cert.factors[factor_index];
 
+        // SAFETY: GMP fully initializes mpz_t via mpzInitSetStrDec before any read.
         var base: c.mpz_t = undefined;
         try mpzInitSetStrDec(f.base, &base);
         defer c.mpz_clear(&base);
 
         if (c.mpz_cmp_ui(&base, 1) <= 0) return fail("factor must be > 1", .{});
 
+        // SAFETY: GMP fully initializes mpz_t via mpz_init before any read.
         var factor_pow: c.mpz_t = undefined;
         c.mpz_init(&factor_pow);
         defer c.mpz_clear(&factor_pow);
@@ -292,12 +299,14 @@ fn verifyMath(cert: Cert) !void {
         c.mpz_mul(&n_minus_one, &n_minus_one, &factor_pow);
     }
 
+    // SAFETY: GMP fully initializes mpz_t via mpz_init before any read.
     var expected_prime: c.mpz_t = undefined;
     c.mpz_init(&expected_prime);
     defer c.mpz_clear(&expected_prime);
     c.mpz_add_ui(&expected_prime, &n_minus_one, 1);
     if (c.mpz_cmp(&prime, &expected_prime) != 0) return fail("prime != product(factors) + 1", .{});
 
+    // SAFETY: GMP fully initializes mpz_t via mpz_init before any read.
     var fermat: c.mpz_t = undefined;
     c.mpz_init(&fermat);
     defer c.mpz_clear(&fermat);
@@ -344,6 +353,7 @@ fn verifyMath(cert: Cert) !void {
 }
 
 fn factorWorkerMain(ctx: *FactorWorkerCtx) void {
+    // SAFETY: GMP fully initializes mpz_t via mpzInitSetStrDec before any read.
     var prime: c.mpz_t = undefined;
     mpzInitSetStrDec(ctx.prime_dec, &prime) catch {
         setFactorFailure(ctx.shared, 3, 0);
@@ -351,6 +361,7 @@ fn factorWorkerMain(ctx: *FactorWorkerCtx) void {
     };
     defer c.mpz_clear(&prime);
 
+    // SAFETY: GMP fully initializes mpz_t via mpzInitSetStrDec before any read.
     var witness: c.mpz_t = undefined;
     mpzInitSetStrDec(ctx.witness_dec, &witness) catch {
         setFactorFailure(ctx.shared, 3, 0);
@@ -358,6 +369,7 @@ fn factorWorkerMain(ctx: *FactorWorkerCtx) void {
     };
     defer c.mpz_clear(&witness);
 
+    // SAFETY: GMP fully initializes mpz_t via mpzInitSetStrDec before any read.
     var n_minus_one: c.mpz_t = undefined;
     mpzInitSetStrDec(ctx.n_minus_one_dec, &n_minus_one) catch {
         setFactorFailure(ctx.shared, 3, 0);
@@ -365,6 +377,7 @@ fn factorWorkerMain(ctx: *FactorWorkerCtx) void {
     };
     defer c.mpz_clear(&n_minus_one);
 
+    // SAFETY: GMP fully initializes mpz_t via mpz_init_set_ui before any read.
     var one: c.mpz_t = undefined;
     c.mpz_init_set_ui(&one, 1);
     defer c.mpz_clear(&one);
@@ -381,6 +394,7 @@ fn factorWorkerMain(ctx: *FactorWorkerCtx) void {
 
         const f = ctx.factors[idx];
 
+        // SAFETY: GMP fully initializes mpz_t via mpzInitSetStrDec before any read.
         var base: c.mpz_t = undefined;
         if (mpzInitSetStrDec(f.base, &base)) |_| {} else |_| {
             setFactorFailure(ctx.shared, 3, idx);
@@ -393,11 +407,13 @@ fn factorWorkerMain(ctx: *FactorWorkerCtx) void {
             break;
         }
 
+        // SAFETY: GMP fully initializes mpz_t via mpz_init before any read.
         var q: c.mpz_t = undefined;
         c.mpz_init(&q);
         defer c.mpz_clear(&q);
         c.mpz_divexact(&q, &n_minus_one, &base);
 
+        // SAFETY: GMP fully initializes mpz_t via mpz_init before any read.
         var check: c.mpz_t = undefined;
         c.mpz_init(&check);
         defer c.mpz_clear(&check);
