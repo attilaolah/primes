@@ -89,16 +89,27 @@ def get_largest_primes():
 import math
 
 def get_l3_cache_size():
-    try:
-        with open("/sys/devices/system/cpu/cpu0/cache/index3/size", "r") as f:
-            size_str = f.read().strip()
-            if size_str.endswith('K'):
-                return int(size_str[:-1]) * 1024
-            elif size_str.endswith('M'):
-                return int(size_str[:-1]) * 1024 * 1024
-    except:
-        pass
-    return 32 * 1024 * 1024 # Default to 32MB fallback
+    import platform
+    if platform.system() == "Darwin":
+        try:
+            # Apple Silicon typically uses large L2/SLC per performance cluster
+            out = subprocess.check_output(["sysctl", "-n", "hw.perflevel0.l2cachesize"]).strip()
+            return int(out)
+        except:
+            try:
+                out = subprocess.check_output(["sysctl", "-n", "hw.l2cachesize"]).strip()
+                return int(out)
+            except:
+                pass
+    else:
+        try:
+            with open("/sys/devices/system/cpu/cpu0/cache/index3/size", "r") as f:
+                size_str = f.read().strip()
+                if size_str.endswith('K'): return int(size_str[:-1]) * 1024
+                if size_str.endswith('M'): return int(size_str[:-1]) * 1024 * 1024
+        except:
+            pass
+    return 32 * 1024 * 1024 # Default fallback (32MB)
 
 def calculate_optimal_sieve_limit():
     l3_bytes = get_l3_cache_size()
@@ -117,7 +128,12 @@ def calculate_optimal_sieve_limit():
 def run_miner():
     print("[*] V3 Dynamic Miner Orchestrator Started")
     print("[*] Compiling C core (v3)...")
-    subprocess.run(["nix-shell", "-p", "gcc", "gmp", "--run", "gcc -O3 -fopenmp search_core_v3.c -lm -lgmp -o search_core_v3"], check=True)
+    import platform
+    if platform.system() == "Darwin":
+        # Apple Silicon native optimizations (M-series specific tuning)
+        subprocess.run(["nix-shell", "-p", "gcc", "gmp", "--run", "gcc -O3 -mcpu=native -mtune=native -fopenmp search_core_v3.c -lm -lgmp -o search_core_v3"], check=True)
+    else:
+        subprocess.run(["nix-shell", "-p", "gcc", "gmp", "--run", "gcc -O3 -fopenmp search_core_v3.c -lm -lgmp -o search_core_v3"], check=True)
     
     max_sieve = calculate_optimal_sieve_limit()
     
