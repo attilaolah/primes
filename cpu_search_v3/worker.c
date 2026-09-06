@@ -43,10 +43,16 @@ int main() {
     long long num_sieve_primes = 0;
     char *is_prime = calloc((size_t)max_sieve + 1, 1);
     for (long long i=2; i<=max_sieve; i++) is_prime[i] = 1;
-    for (long long p=2; p<=max_sieve; p++) {
+    for (long long p = 2; p * p <= max_sieve; p++) {
+        if (is_prime[p]) {
+            for (long long i = p * p; i <= max_sieve; i += p) {
+                is_prime[i] = 0;
+            }
+        }
+    }
+    for (long long p = 2; p <= max_sieve; p++) {
         if (is_prime[p]) {
             sieve_primes[num_sieve_primes++] = p;
-            for (long long i=p*p; i<=max_sieve; i+=p) is_prime[i] = 0;
         }
     }
     
