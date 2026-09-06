@@ -88,42 +88,13 @@ def get_largest_primes():
 
 import math
 
-def get_l3_cache_size():
-    import platform
-    if platform.system() == "Darwin":
-        try:
-            # Apple Silicon typically uses large L2/SLC per performance cluster
-            out = subprocess.check_output(["sysctl", "-n", "hw.perflevel0.l2cachesize"]).strip()
-            return int(out)
-        except:
-            try:
-                out = subprocess.check_output(["sysctl", "-n", "hw.l2cachesize"]).strip()
-                return int(out)
-            except:
-                pass
-    else:
-        try:
-            with open("/sys/devices/system/cpu/cpu0/cache/index3/size", "r") as f:
-                size_str = f.read().strip()
-                if size_str.endswith('K'): return int(size_str[:-1]) * 1024
-                if size_str.endswith('M'): return int(size_str[:-1]) * 1024 * 1024
-        except:
-            pass
-    return 32 * 1024 * 1024 # Default fallback (32MB)
-
 def calculate_optimal_sieve_limit():
-    l3_bytes = get_l3_cache_size()
-    # M(L) = L + 8 * (L / ln(L)) bytes (is_prime array + K_mod + sieve_primes)
-    # We target exactly 80% of L3 cache to prevent RAM spill
-    target = l3_bytes * 0.8
-    L = 1000000.0
-    for _ in range(20):
-        current_mem = L + 8.0 * (L / math.log(L))
-        L = L * (target / current_mem)
-    max_sieve = int(L)
-    print(f"[*] Detected L3 Cache: {l3_bytes / 1024 / 1024:.1f} MB")
-    print(f"[*] Auto-Tuning Dynamic Sieve Limit to: {max_sieve:,}")
-    return max_sieve
+    # Deep Sieve Mode (Override L2 Cache constraints)
+    # At this scale (10+ min Fermat tests), we want to filter candidates as aggressively as possible.
+    # 5 Billion takes ~5GB of RAM and ~2 minutes to init, but completely eliminates false positives
+    # caused by factors up to 5,000,000,000.
+    print("[*] Deep Sieve Enabled: Bypassing cache boundaries for max filtration.")
+    return 5000000000
 
 def run_search():
     print("[*] V3 Dynamic Fermat Search Orchestrator Started")
