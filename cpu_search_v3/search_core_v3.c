@@ -4,6 +4,7 @@
 #include <omp.h>
 #include <sys/time.h>
 #include <time.h>
+#include <math.h>
 
 #define MEDIAN_WINDOW 101
 
@@ -37,7 +38,6 @@ int main() {
     mpz_mul_ui(base, base, 2);
     
     // --- SIEVE INITIALIZATION ---
-    #include <math.h>
     int max_primes = (int)((double)max_sieve / log(max_sieve) * 1.3); // Safe upper bound via Prime Number Theorem
     int *sieve_primes = malloc(max_primes * sizeof(int));
     int num_sieve_primes = 0;
