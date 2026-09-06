@@ -79,6 +79,7 @@ __global__ void batched_carry_propagate(int32_t *d_poly) {
         int64_t carry = 0;
         int offset = batch_idx * N;
         
+        #pragma unroll 1
         for (int i = 0; i < N; i++) {
             int64_t val = d_poly[offset + i] + carry;
             
