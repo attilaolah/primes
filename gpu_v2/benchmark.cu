@@ -1,15 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda_runtime.h>
+#include <sys/time.h>
 #include "ntt_core.cuh"
 
-// We need N=65536 because a 224,000 bit number = 31,945 base-128 coefficients.
-// Multiplying two 32k polynomials yields a 64k polynomial.
 #define N 65536
 #define LOG_N 16
-#define BATCH_SIZE 128 // Process 128 candidates simultaneously to hide CPU launch overhead
+#define BATCH_SIZE 128
 
-// Bit-reversal permutation (Batched)
 __device__ uint32_t reverse_bits(uint32_t x, int bits) {
     uint32_t res = 0;
     for (int i = 0; i < bits; i++) {
@@ -23,7 +21,6 @@ __global__ void batched_bit_reverse(uint32_t *d_poly) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int batch_idx = tid / N;
     int i = tid % N;
-    
     if (batch_idx < BATCH_SIZE) {
         uint32_t rev = reverse_bits(i, LOG_N);
         if (i < rev) {
@@ -36,11 +33,9 @@ __global__ void batched_bit_reverse(uint32_t *d_poly) {
     }
 }
 
-// Batched Butterfly Stage
 __global__ void batched_butterfly_stage(uint32_t *d_poly, int m, uint32_t wm) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int total_butterflies = BATCH_SIZE * (N / 2);
-    
     if (tid < total_butterflies) {
         int batch_idx = tid / (N / 2);
         int local_tid = tid % (N / 2);
@@ -63,7 +58,6 @@ __global__ void batched_butterfly_stage(uint32_t *d_poly, int m, uint32_t wm) {
     }
 }
 
-// Batched Pointwise Multiply
 __global__ void batched_pointwise_mul(uint32_t *d_A, uint32_t *d_B) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < BATCH_SIZE * N) {
@@ -71,72 +65,97 @@ __global__ void batched_pointwise_mul(uint32_t *d_A, uint32_t *d_B) {
     }
 }
 
-// CPU Orchestrator
-void run_batched_ntt(uint32_t *d_poly, bool inverse) {
+void run_batched_ntt(uint32_t *d_poly, bool inverse, cudaStream_t stream) {
     int threads = 256;
     int blocks_N = (BATCH_SIZE * N + threads - 1) / threads;
     int blocks_half_N = (BATCH_SIZE * (N / 2) + threads - 1) / threads;
     
-    batched_bit_reverse<<<blocks_N, threads>>>(d_poly);
+    batched_bit_reverse<<<blocks_N, threads, 0, stream>>>(d_poly);
     
     for (int s = 1; s <= LOG_N; s++) {
         int m = 1 << s;
         uint32_t wm = pow_mod(NTT_ROOT, (NTT_Q - 1) / m);
         if (inverse) wm = pow_mod(wm, NTT_Q - 2);
         
-        batched_butterfly_stage<<<blocks_half_N, threads>>>(d_poly, m, wm);
+        batched_butterfly_stage<<<blocks_half_N, threads, 0, stream>>>(d_poly, m, wm);
     }
 }
 
+double get_time() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec + tv.tv_usec * 1e-6;
+}
+
 int main() {
-    printf("[*] GPU V2 Benchmark: Batched NTT Multiplier\n");
-    printf("[*] Configuration: N = %d, Bits = ~224k, Batch Size = %d\n", N, BATCH_SIZE);
+    printf("[*] GPU V2 FULL Fermat Throughput Benchmark (CUDA Graphs)\n");
+    printf("[*] Configuration: %d Candidates simultaneously\n", BATCH_SIZE);
+    printf("[*] Polynomial Size: N=%d (~224,000 bits per candidate)\n", N);
     
     size_t mem_size = BATCH_SIZE * N * sizeof(uint32_t);
     uint32_t *d_A, *d_B;
     cudaMalloc(&d_A, mem_size);
     cudaMalloc(&d_B, mem_size);
     
-    // Warmup
-    run_batched_ntt(d_A, false);
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
     
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    printf("[*] Capturing CUDA execution graph for 1 iteration...\n");
+    cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal);
+    run_batched_ntt(d_A, false, stream);
+    run_batched_ntt(d_B, false, stream);
     
-    int iterations = 10;
-    cudaEventRecord(start);
+    int threads = 256;
+    int blocks = (BATCH_SIZE * N + threads - 1) / threads;
+    batched_pointwise_mul<<<blocks, threads, 0, stream>>>(d_A, d_B);
     
-    for (int i = 0; i < iterations; i++) {
-        run_batched_ntt(d_A, false);
-        run_batched_ntt(d_B, false);
+    run_batched_ntt(d_A, true, stream);
+    
+    cudaGraph_t graph;
+    cudaStreamEndCapture(stream, &graph);
+    
+    cudaGraphExec_t graphExec;
+    cudaGraphInstantiate(&graphExec, graph, NULL, NULL, 0);
+    
+    int total_ops = 223616;
+    int chunk_size = 5000;
+    
+    printf("[*] Launching %d iterations. This will take ~55 minutes...\n\n", total_ops);
+    
+    double start_time = get_time();
+    int ops_done = 0;
+    
+    while (ops_done < total_ops) {
+        int current_chunk = (total_ops - ops_done < chunk_size) ? (total_ops - ops_done) : chunk_size;
         
-        int threads = 256;
-        int blocks = (BATCH_SIZE * N + threads - 1) / threads;
-        batched_pointwise_mul<<<blocks, threads>>>(d_A, d_B);
+        for (int i = 0; i < current_chunk; i++) {
+            cudaGraphLaunch(graphExec, stream);
+        }
+        cudaStreamSynchronize(stream);
+        ops_done += current_chunk;
         
-        run_batched_ntt(d_A, true);
+        double elapsed = get_time() - start_time;
+        double ops_per_sec = ops_done / elapsed;
+        double remaining_sec = (total_ops - ops_done) / ops_per_sec;
+        
+        printf("\r[+] Progress: %6d / %d (%.1f%%) | Elapsed: %02d:%02d | ETA: %02d:%02d", 
+               ops_done, total_ops, 100.0 * ops_done / total_ops,
+               (int)elapsed / 60, (int)elapsed % 60,
+               (int)remaining_sec / 60, (int)remaining_sec % 60);
+        fflush(stdout);
     }
     
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-    
-    float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
-    
-    float ms_per_batch = milliseconds / iterations;
-    float ms_per_mul = ms_per_batch / BATCH_SIZE;
-    
-    printf("[+] Time for 1 Full Multiplication (NTT + iNTT): %.3f ms\n", ms_per_mul);
-    
-    // Fermat Test requires ~223,616 squarings/multiplications
-    int fermat_ops = 223616;
-    float expected_fermat_sec = (ms_per_mul * fermat_ops) / 1000.0f;
-    
-    printf("[+] Projected GPU Time per Fermat Test: %.2f seconds (%.2f minutes)\n", expected_fermat_sec, expected_fermat_sec / 60.0f);
+    double total_time = get_time() - start_time;
+    printf("\n\n[*] BOOM! Benchmark Complete.\n");
+    printf("[+] Total Wall-Clock Time: %.2f seconds (%.2f minutes)\n", total_time, total_time / 60.0);
+    printf("[+] Total Candidates Processed: %d\n", BATCH_SIZE);
+    printf("[+] Amortized Time per Candidate: %.2f seconds!\n", total_time / BATCH_SIZE);
     
     cudaFree(d_A);
     cudaFree(d_B);
+    cudaStreamDestroy(stream);
+    cudaGraphExecDestroy(graphExec);
+    cudaGraphDestroy(graph);
     
     return 0;
 }
