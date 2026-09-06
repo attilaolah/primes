@@ -4,6 +4,9 @@ import subprocess
 import hashlib
 import time
 
+# Ensure we are always running from the script's directory for relative paths
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 sys.set_int_max_str_digits(0)
 
 DATA_DIR = "../data"
