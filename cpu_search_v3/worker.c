@@ -52,11 +52,18 @@ int main() {
             }
         }
     }
+    long long extract_step = max_sieve / 1000;
+    if (extract_step == 0) extract_step = 1;
     for (long long p = 2; p <= max_sieve; p++) {
         if (is_prime[p]) {
             sieve_primes[num_sieve_primes++] = p;
         }
+        if (p % extract_step == 0 || p == max_sieve) {
+            printf("\r[*] Extracting primes: %4.1f%% complete...", (double)p * 100.0 / max_sieve);
+            fflush(stdout);
+        }
     }
+    printf("\n");
     
     // --- RANDOMIZE SEARCH SPACE ---
     srand((unsigned int)time(NULL));
@@ -73,18 +80,26 @@ int main() {
     
     long long *K_mod = malloc((size_t)num_sieve_primes * sizeof(long long));
     double M_sieve = 1.0;
-    long long report_step = num_sieve_primes / 20;
+    
+    // Parallelize modulo precomputation to slice initialization time by 10x-20x
+    long long report_step = num_sieve_primes / 1000;
     if (report_step == 0) report_step = 1;
-    for (long long i=0; i<num_sieve_primes; i++) {
+    
+    int done_count = 0;
+    #pragma omp parallel for schedule(static) reduction(*:M_sieve)
+    for (long long i = 0; i < num_sieve_primes; i++) {
         K_mod[i] = mpz_fdiv_ui(base, (unsigned long)sieve_primes[i]);
         M_sieve *= (1.0 - 1.0 / (double)sieve_primes[i]);
         
-        if ((i + 1) % report_step == 0 || i + 1 == num_sieve_primes) {
-            printf("\r[*] Modulo precomputation: %3lld%% complete...", ((i + 1) * 100) / num_sieve_primes);
+        #pragma omp atomic
+        done_count++;
+        
+        if (omp_get_thread_num() == 0 && done_count % report_step == 0) {
+            printf("\r[*] Modulo precomputation (Parallel): %4.1f%% complete...", (double)done_count * 100.0 / num_sieve_primes);
             fflush(stdout);
         }
     }
-    printf("\n");
+    printf("\r[*] Modulo precomputation (Parallel): 100.0%% complete...\n");
     free(is_prime);
     
     int found = 0;
