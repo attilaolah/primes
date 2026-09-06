@@ -125,8 +125,8 @@ def calculate_optimal_sieve_limit():
     print(f"[*] Auto-Tuning Dynamic Sieve Limit to: {max_sieve:,}")
     return max_sieve
 
-def run_miner():
-    print("[*] V3 Dynamic Miner Orchestrator Started")
+def run_search():
+    print("[*] V3 Dynamic Fermat Search Orchestrator Started")
     print("[*] Compiling C core (v3)...")
     import platform
     if platform.system() == "Darwin":
@@ -216,4 +216,4 @@ def run_miner():
             time.sleep(2)
 
 if __name__ == "__main__":
-    run_miner()
+    run_search()

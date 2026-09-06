@@ -141,7 +141,7 @@ void carry_propagate_standard(uint32_t *d_poly, uint32_t *d_trans, cudaStream_t 
 }
 
 // ---------------------------------------------------------------------------
-// Main Miner Shell
+// Main Fermat Search Shell
 // ---------------------------------------------------------------------------
 int main(int argc, char **argv) {
     if (argc < 2) {
@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     
-    printf("[*] GPU Miner initialized. Batch: %u, N: %u, Max Bits: %u\n", BATCH_SIZE, N_SIZE, max_bits);
+    printf("[*] GPU Fermat Search initialized. Batch: %u, N: %u, Max Bits: %u\n", BATCH_SIZE, N_SIZE, max_bits);
     
     size_t mem_size = BATCH_SIZE * N_SIZE * sizeof(uint32_t);
     uint32_t *h_P = (uint32_t*)malloc(mem_size);
