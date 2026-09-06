@@ -92,26 +92,26 @@ def main():
         
     print(f"[*] Max bits in E: {max_bits}. Generating binary batch payload...")
     
-    # 3. Transpose arrays for GPU Coalesced Access
+    # 3. Write arrays in standard layout
     with open("batch.bin", "wb") as f:
         f.write(b"PRM2")
         f.write(struct.pack("<I", BATCH_SIZE))
         f.write(struct.pack("<I", N_SIZE))
         f.write(struct.pack("<I", max_bits))
         
-        # Write P_data transposed
-        for i in range(N_SIZE):
-            for batch in range(BATCH_SIZE):
+        # Write P_data standard
+        for batch in range(BATCH_SIZE):
+            for i in range(N_SIZE):
                 f.write(struct.pack("<I", P_data[batch][i]))
                 
-        # Write M_data transposed
-        for i in range(N_SIZE):
-            for batch in range(BATCH_SIZE):
+        # Write M_data standard
+        for batch in range(BATCH_SIZE):
+            for i in range(N_SIZE):
                 f.write(struct.pack("<I", M_data[batch][i]))
                 
-        # Write E_bits transposed
-        for i in range(max_bits):
-            for batch in range(BATCH_SIZE):
+        # Write E_bits standard
+        for batch in range(BATCH_SIZE):
+            for i in range(max_bits):
                 f.write(struct.pack("<B", E_bits[batch][i]))
                 
     print("[+] Wrote 7.3 MB binary payload to batch.bin!")

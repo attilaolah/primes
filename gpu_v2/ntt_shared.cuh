@@ -45,7 +45,7 @@ __device__ void ntt_256_shared(uint32_t *s_poly, uint32_t *d_wm) {
         
         // Root of unity for N=256
         uint32_t wm = d_wm[s - 1];
-        if (inverse) wm = pow_mod(wm, NTT_Q - 2);
+        // (inverse check was removed, handled via pre-calculated d_twiddles)
         
         // Each thread processes 1 butterfly
         int group = tid / half_m;
