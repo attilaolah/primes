@@ -38,6 +38,8 @@ int main() {
     mpz_mul_ui(base, base, 2);
     
     // --- SIEVE INITIALIZATION ---
+    printf("[*] Allocating %lld bytes and marking primes (this takes ~10 seconds)...\n", max_sieve);
+    fflush(stdout);
     long long max_primes = (long long)((double)max_sieve / log(max_sieve) * 1.3); // Safe upper bound via Prime Number Theorem
     long long *sieve_primes = malloc((size_t)max_primes * sizeof(long long));
     long long num_sieve_primes = 0;
@@ -65,12 +67,24 @@ int main() {
         sieve_primes[j] = temp;
     }
     
+    printf("[*] Sieve complete! Found %lld primes.\n", num_sieve_primes);
+    printf("[*] Precomputing %lld high-precision modulos (this takes a few minutes)...\n", num_sieve_primes);
+    fflush(stdout);
+    
     long long *K_mod = malloc((size_t)num_sieve_primes * sizeof(long long));
     double M_sieve = 1.0;
+    long long report_step = num_sieve_primes / 20;
+    if (report_step == 0) report_step = 1;
     for (long long i=0; i<num_sieve_primes; i++) {
         K_mod[i] = mpz_fdiv_ui(base, (unsigned long)sieve_primes[i]);
         M_sieve *= (1.0 - 1.0 / (double)sieve_primes[i]);
+        
+        if ((i + 1) % report_step == 0 || i + 1 == num_sieve_primes) {
+            printf("\r[*] Modulo precomputation: %3lld%% complete...", ((i + 1) * 100) / num_sieve_primes);
+            fflush(stdout);
+        }
     }
+    printf("\n");
     free(is_prime);
     
     int found = 0;
