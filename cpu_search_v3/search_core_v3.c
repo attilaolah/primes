@@ -19,9 +19,9 @@ int main() {
     if (!f) return 1;
     char p1_str[50000], p2_str[50000], p3_str[50000];
     long long max_sieve = 5000000000LL;
-    fscanf(f, "%s", p1_str);
-    fscanf(f, "%s", p2_str);
-    fscanf(f, "%s", p3_str);
+    if (fscanf(f, "%49999s", p1_str) != 1) { fclose(f); return 1; }
+    if (fscanf(f, "%49999s", p2_str) != 1) { fclose(f); return 1; }
+    if (fscanf(f, "%49999s", p3_str) != 1) { fclose(f); return 1; }
     if (fscanf(f, "%lld", &max_sieve) != 1) {
         max_sieve = 5000000000LL;
     }
