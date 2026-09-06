@@ -105,9 +105,9 @@ def run_search():
     import platform
     if platform.system() == "Darwin":
         # Apple Silicon native optimizations (M-series specific tuning), bypassing Nix impurity checks
-        subprocess.run(["nix-shell", "-p", "gcc", "gmp", "--run", "env NIX_ENFORCE_NO_NATIVE=0 gcc -O3 -mcpu=native -mtune=native -fopenmp search_core_v3.c -lm -lgmp -o search_core_v3"], check=True)
+        subprocess.run(["nix-shell", "-p", "gcc", "gmp", "--run", "env NIX_ENFORCE_NO_NATIVE=0 gcc -O3 -mcpu=native -mtune=native -fopenmp worker.c -lm -lgmp -o worker"], check=True)
     else:
-        subprocess.run(["nix-shell", "-p", "gcc", "gmp", "--run", "gcc -O3 -fopenmp search_core_v3.c -lm -lgmp -o search_core_v3"], check=True)
+        subprocess.run(["nix-shell", "-p", "gcc", "gmp", "--run", "gcc -O3 -fopenmp worker.c -lm -lgmp -o worker"], check=True)
     
     max_sieve = calculate_optimal_sieve_limit()
     
@@ -125,7 +125,7 @@ def run_search():
             f.write(f"{p1}\n{p2}\n{p3}\n{max_sieve}\n")
             
         print("[+] Launching C core...")
-        process = subprocess.Popen(["./search_core_v3"], stdout=subprocess.PIPE, text=True)
+        process = subprocess.Popen(["./worker"], stdout=subprocess.PIPE, text=True)
         
         cert_lines = []
         capturing = False
