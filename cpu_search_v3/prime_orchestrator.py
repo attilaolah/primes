@@ -130,8 +130,8 @@ def run_search():
     print("[*] Compiling C core (v3)...")
     import platform
     if platform.system() == "Darwin":
-        # Apple Silicon native optimizations (M-series specific tuning)
-        subprocess.run(["nix-shell", "-p", "gcc", "gmp", "--run", "gcc -O3 -mcpu=native -mtune=native -fopenmp search_core_v3.c -lm -lgmp -o search_core_v3"], check=True)
+        # Apple Silicon native optimizations (M-series specific tuning), bypassing Nix impurity checks
+        subprocess.run(["nix-shell", "-p", "gcc", "gmp", "--run", "env NIX_ENFORCE_NO_NATIVE=0 gcc -O3 -mcpu=native -mtune=native -fopenmp search_core_v3.c -lm -lgmp -o search_core_v3"], check=True)
     else:
         subprocess.run(["nix-shell", "-p", "gcc", "gmp", "--run", "gcc -O3 -fopenmp search_core_v3.c -lm -lgmp -o search_core_v3"], check=True)
     
