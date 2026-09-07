@@ -58,17 +58,29 @@ int main() {
     
     uint32_t num_limbs, num_primes, N;
     uint64_t q_start;
-    fread(&num_limbs, 4, 1, f);
-    fread(&num_primes, 4, 1, f);
-    fread(&N, 4, 1, f);
-    fread(&q_start, 8, 1, f);
+    size_t items_read = 0;
+    items_read += fread(&num_limbs, 4, 1, f);
+    items_read += fread(&num_primes, 4, 1, f);
+    items_read += fread(&N, 4, 1, f);
+    items_read += fread(&q_start, 8, 1, f);
+    if (items_read != 4) {
+        printf("[-] Failed to read header from sieve_input.bin\n");
+        fclose(f);
+        return 1;
+    }
     
     uint32_t *h_base_limbs = (uint32_t*)malloc(num_limbs * 4);
     uint64_t *h_primes = (uint64_t*)malloc(num_primes * 8);
     uint8_t *h_is_q_bad = (uint8_t*)calloc(N, 1);
     
-    fread(h_base_limbs, 4, num_limbs, f);
-    fread(h_primes, 8, num_primes, f);
+    items_read = 0;
+    items_read += fread(h_base_limbs, 4, num_limbs, f);
+    items_read += fread(h_primes, 8, num_primes, f);
+    if (items_read != (size_t)num_limbs + (size_t)num_primes) {
+        printf("[-] Failed to read array data from sieve_input.bin\n");
+        fclose(f);
+        return 1;
+    }
     fclose(f);
     
     uint32_t *d_base_limbs;
@@ -92,7 +104,9 @@ int main() {
     cudaMemcpy(h_is_q_bad, d_is_q_bad, N, cudaMemcpyDeviceToHost);
     
     FILE *out = fopen("sieve_output.bin", "wb");
-    fwrite(h_is_q_bad, 1, N, out);
+    if (fwrite(h_is_q_bad, 1, N, out) != N) {
+        printf("[-] Warning: Failed to write all data to sieve_output.bin\n");
+    }
     fclose(out);
     
     // Cleanup
