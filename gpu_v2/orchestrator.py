@@ -46,7 +46,9 @@ def main():
     # 1. Simple Sieve for 128 candidates
     print("[*] Sieving 128 candidates...")
     candidates = []
-    q = 3
+    import random
+    # Start at a random odd q to ensure unique batches across runs
+    q = random.randrange(3, 1000000000, 2)
     while len(candidates) < BATCH_SIZE:
         if all(q % p != 0 for p in [2,3,5,7,11,13,17,19,23,29,31]):
             # Quick divisibility test for P
