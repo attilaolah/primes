@@ -24,18 +24,12 @@ def get_largest_primes():
     primes.sort(reverse=True)
     return primes[:3]
 
-def get_primes(limit):
-    """Fast pure-python bytearray sieve to get primes up to `limit`."""
-    sieve = bytearray([1]) * (limit // 2)
-    for i in range(3, int(limit**0.5) + 1, 2):
-        if sieve[i//2]:
-            sieve[i*i//2::i] = bytearray([0]) * len(sieve[i*i//2::i])
-    return [2] + [2*i+1 for i, v in enumerate(sieve) if v and i > 0]
-
 def main():
     print("[*] GPU Sieve Profiler Starting...")
     
-    # 1. Compile the CUDA kernel
+    print("[*] Compiling C Input Generator...")
+    subprocess.run(["nix-shell", "-p", "gcc", "--run", "gcc -O3 generate_input.c -o generate_input"], check=True)
+    
     print("[*] Compiling CUDA Sieve Kernel...")
     subprocess.run(["env", "NIXPKGS_ALLOW_UNFREE=1", "nix-shell", "-p", "cudatoolkit", "--run", "nvcc -O3 -arch=native sieve.cu -o sieve"], check=True)
     
@@ -53,38 +47,25 @@ def main():
         
     print(f"[*] Base is {len(base_limbs)} limbs (32-bit).")
     
-    # 3. Parameters for profiling
-    # We will test N=10,000,000 candidates starting from an arbitrary offset
+    # 3. Parameters for production run
+    # Let's run a massive 10 Million candidates through a 10 Billion prime limit
     N_CANDIDATES = 10000000
     Q_START = 1000000001
     
-    sieve_sizes = [10**6, 10**7, 10**8]
+    sieve_sizes = [10**9, 10**10]
     
     for size in sieve_sizes:
         print(f"\n======================================")
-        print(f"[*] Profiling Sieve Limit: {size:,}")
+        print(f"[*] Executing Sieve Limit: {size:,}")
         
-        # A. Generate primes
+        # A. Generate primes and binary input via C helper
         t0 = time.time()
-        sieve_primes = get_primes(size)
+        cmd = ["./generate_input", str(len(base_limbs)), str(N_CANDIDATES), str(Q_START), str(size)] + [str(x) for x in base_limbs]
+        subprocess.run(cmd, check=True)
         t1 = time.time()
-        print(f"  -> Generated {len(sieve_primes):,} primes in {t1-t0:.2f}s")
+        print(f"  -> Generated primes and wrote payload in {t1-t0:.2f}s")
         
-        # B. Write input binary
-        t0 = time.time()
-        with open("sieve_input.bin", "wb") as f:
-            f.write(struct.pack("<I", len(base_limbs)))
-            f.write(struct.pack("<I", len(sieve_primes)))
-            f.write(struct.pack("<I", N_CANDIDATES))
-            f.write(struct.pack("<Q", Q_START))
-            for limb in base_limbs:
-                f.write(struct.pack("<I", limb))
-            for p in sieve_primes:
-                f.write(struct.pack("<Q", p))
-        t1 = time.time()
-        print(f"  -> Wrote binary payload in {t1-t0:.2f}s")
-        
-        # C. Run GPU Sieve
+        # B. Run GPU Sieve
         t0 = time.time()
         env = os.environ.copy()
         env["LD_LIBRARY_PATH"] = "/run/opengl-driver/lib"
@@ -93,7 +74,7 @@ def main():
         gpu_time = t1 - t0
         print(f"  -> [GPU KERNEL] Sieve execution took: {gpu_time:.4f}s")
         
-        # D. Read output and find survivors
+        # C. Read output and find survivors
         with open("sieve_output.bin", "rb") as f:
             is_bad = f.read(N_CANDIDATES)
             
@@ -109,7 +90,7 @@ def main():
             for s in survivors:
                 f.write(f"{s}\n")
                 
-    print("\n[*] Profiling complete! Candidates saved to text files.")
+    print("\n[*] GPU Sieve complete! Candidates saved to text files ready for scp.")
 
 if __name__ == "__main__":
     main()
