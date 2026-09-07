@@ -3,6 +3,8 @@ import sys
 import subprocess
 import time
 
+sys.set_int_max_str_digits(0)
+
 # Ensure we run from the script's directory
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 

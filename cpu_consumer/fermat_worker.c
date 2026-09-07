@@ -37,7 +37,11 @@ int main() {
 
     long long *qs = malloc(num_qs * sizeof(long long));
     for (int i = 0; i < num_qs; i++) {
-        fscanf(f, "%lld", &qs[i]);
+        if (fscanf(f, "%lld", &qs[i]) != 1) {
+            printf("[-] Failed to read candidate %d from batch_input.txt\n", i);
+            fclose(f);
+            return 1;
+        }
     }
     fclose(f);
 
