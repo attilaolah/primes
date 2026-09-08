@@ -247,47 +247,61 @@ int main(int argc, char **argv) {
     
     int pointwise_blocks = (BATCH_SIZE * N_SIZE + 255) / 256;
     
+    // Capture the entire Barrett Squaring sequence into a CUDA Graph
+    cudaGraph_t graph;
+    cudaGraphExec_t instance;
+    cudaStream_t capture_stream;
+    cudaStreamCreate(&capture_stream);
+    
+    cudaStreamBeginCapture(capture_stream, cudaStreamCaptureModeGlobal);
+    
+    // --- BARRETT REDUCTION (3 NTT Multiplications) ---
+    // 1. X = A * A
+    launch_matrix_ntt(d_A, d_twiddles_fwd, true, capture_stream);
+    batched_pointwise_sqr<<<pointwise_blocks, 256, 0, capture_stream>>>(d_A, d_X);
+    launch_matrix_ntt(d_X, d_twiddles_inv, false, capture_stream);
+    carry_propagate_standard(d_X, d_trans, capture_stream);
+    
+    // 2. Q1 = X >> (L - 1)
+    batched_shift_right<<<pointwise_blocks, 256, 0, capture_stream>>>(d_Q1, d_X, L_DIGITS - 1);
+    
+    // 3. Q2 = Q1 * M
+    launch_matrix_ntt(d_Q1, d_twiddles_fwd, true, capture_stream);
+    batched_pointwise_mul<<<pointwise_blocks, 256, 0, capture_stream>>>(d_Q1, d_M, d_Q2);
+    launch_matrix_ntt(d_Q2, d_twiddles_inv, false, capture_stream);
+    carry_propagate_standard(d_Q2, d_trans, capture_stream);
+    
+    // 4. Q3 = Q2 >> (L + 1)
+    batched_shift_right<<<pointwise_blocks, 256, 0, capture_stream>>>(d_Q3, d_Q2, L_DIGITS + 1);
+    
+    // 5. R1 = X mod B^(L+1)
+    batched_mod_base<<<pointwise_blocks, 256, 0, capture_stream>>>(d_R1, d_X, L_DIGITS + 1);
+    
+    // 6. R2 = Q3 * P
+    launch_matrix_ntt(d_Q3, d_twiddles_fwd, true, capture_stream);
+    batched_pointwise_mul<<<pointwise_blocks, 256, 0, capture_stream>>>(d_Q3, d_P_ntt, d_R2);
+    launch_matrix_ntt(d_R2, d_twiddles_inv, false, capture_stream);
+    carry_propagate_standard(d_R2, d_trans, capture_stream);
+    batched_mod_base<<<pointwise_blocks, 256, 0, capture_stream>>>(d_R2, d_R2, L_DIGITS + 1);
+    
+    // 7. R1 = R1 - R2
+    batched_sub<<<pointwise_blocks, 256, 0, capture_stream>>>(d_R1, d_R1, d_R2);
+    carry_propagate_standard(d_R1, d_trans, capture_stream); // handles negative borrows
+    
+    // 8. Final Thresholding against P (Requires Transpose for Coalescence)
+    transpose_batch_forward<<<t_blocks_fwd, t_threads, 0, capture_stream>>>(d_R1, d_trans, N_SIZE, BATCH_SIZE);
+    int cp_blocks = (BATCH_SIZE + 127) / 128;
+    batched_reduce_final<<<cp_blocks, 128, 0, capture_stream>>>(d_trans, d_P_trans, L_DIGITS, BATCH_SIZE);
+    
+    cudaStreamEndCapture(capture_stream, &graph);
+    cudaGraphInstantiate(&instance, graph, NULL, NULL, 0);
+    
     printf("[*] Pre-computations finished. GPU is entering Fermat Square-and-Multiply Loop!\n");
     double start_time = get_time();
     
     for (int bit = max_bits - 1; bit >= 0; bit--) {
-        // --- BARRETT REDUCTION (3 NTT Multiplications) ---
-        // 1. X = A * A
-        launch_matrix_ntt(d_A, d_twiddles_fwd, true, stream);
-        batched_pointwise_sqr<<<pointwise_blocks, 256, 0, stream>>>(d_A, d_X);
-        launch_matrix_ntt(d_X, d_twiddles_inv, false, stream);
-        carry_propagate_standard(d_X, d_trans, stream);
-        
-        // 2. Q1 = X >> (L - 1)
-        batched_shift_right<<<pointwise_blocks, 256, 0, stream>>>(d_Q1, d_X, L_DIGITS - 1);
-        
-        // 3. Q2 = Q1 * M
-        launch_matrix_ntt(d_Q1, d_twiddles_fwd, true, stream);
-        batched_pointwise_mul<<<pointwise_blocks, 256, 0, stream>>>(d_Q1, d_M, d_Q2);
-        launch_matrix_ntt(d_Q2, d_twiddles_inv, false, stream);
-        carry_propagate_standard(d_Q2, d_trans, stream);
-        
-        // 4. Q3 = Q2 >> (L + 1)
-        batched_shift_right<<<pointwise_blocks, 256, 0, stream>>>(d_Q3, d_Q2, L_DIGITS + 1);
-        
-        // 5. R1 = X mod B^(L+1)
-        batched_mod_base<<<pointwise_blocks, 256, 0, stream>>>(d_R1, d_X, L_DIGITS + 1);
-        
-        // 6. R2 = Q3 * P
-        launch_matrix_ntt(d_Q3, d_twiddles_fwd, true, stream);
-        batched_pointwise_mul<<<pointwise_blocks, 256, 0, stream>>>(d_Q3, d_P_ntt, d_R2);
-        launch_matrix_ntt(d_R2, d_twiddles_inv, false, stream);
-        carry_propagate_standard(d_R2, d_trans, stream);
-        batched_mod_base<<<pointwise_blocks, 256, 0, stream>>>(d_R2, d_R2, L_DIGITS + 1);
-        
-        // 7. R1 = R1 - R2
-        batched_sub<<<pointwise_blocks, 256, 0, stream>>>(d_R1, d_R1, d_R2);
-        carry_propagate_standard(d_R1, d_trans, stream); // handles negative borrows
-        
-        // 8. Final Thresholding against P (Requires Transpose for Coalescence)
-        transpose_batch_forward<<<t_blocks_fwd, t_threads, 0, stream>>>(d_R1, d_trans, N_SIZE, BATCH_SIZE);
-        int cp_blocks = (BATCH_SIZE + 127) / 128;
-        batched_reduce_final<<<cp_blocks, 128, 0, stream>>>(d_trans, d_P_trans, L_DIGITS, BATCH_SIZE);
+        // Execute the captured 32-kernel Barrett Squaring sequence instantly
+        cudaGraphLaunch(instance, stream);
         
         // 9. Conditional Multiply by 2
         batched_mul2_cond<<<cp_blocks, 128, 0, stream>>>(d_trans, d_P_trans, d_E, bit, L_DIGITS, BATCH_SIZE);
