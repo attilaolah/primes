@@ -56,6 +56,12 @@
             install -m755 verify "$out/bin/verify"
             runHook postInstall
           '';
+
+          meta = {
+            description = "Pratt certificate verifier.";
+            maintainers = with pkgs.lib.maintainers; [attila];
+            mainProgram = "verify";
+          };
         };
         program = pkgs.lib.getExe verifyPkg;
         verify = {
