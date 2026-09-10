@@ -171,13 +171,24 @@ int main() {
                     e_sec = (int)((diff * f_sec) / omp_get_num_threads());
                 }
             }
+
+            double prime_probability;
+            if (c_count <= 0 || expected_P <= 0) {
+                prime_probability = 0.0;
+            } else if (expected_P == 1) {
+                prime_probability = 1.0;
+            } else {
+                prime_probability = -expm1(c_count * log1p(-1.0 / expected_P));
+                if (prime_probability < 0.0) prime_probability = 0.0;
+                if (prime_probability > 1.0) prime_probability = 1.0;
+            }
             
-            printf("[T%02d | %02d:%02d:%02d | E%c %02d:%02d:%02d | F %02d:%02d] [C %5d | P %5d] [Q %8lld]\n", 
-                   tid, 
-                   elapsed/3600, (elapsed%3600)/60, elapsed%60, 
-                   e_sign, e_sec/3600, (e_sec%3600)/60, e_sec%60,
-                   f_sec/60, f_sec%60,
-                   c_count, expected_P, q);
+            printf("[T%02d | %02d:%02d:%02d | E%c %02d:%02d:%02d | F %02d:%02d] [C %5d | P %5d | %.2f%%] [Q %8lld]\n", 
+                    tid, 
+                    elapsed/3600, (elapsed%3600)/60, elapsed%60, 
+                    e_sign, e_sec/3600, (e_sec%3600)/60, e_sec%60,
+                    f_sec/60, f_sec%60,
+                    c_count, expected_P, prime_probability * 100.0, q);
             fflush(stdout);
         }
         
