@@ -1,6 +1,8 @@
+import hashlib
 import unittest
 
-from candidate_plan import candidate_plan, read_plan, primes_to
+import candidate_plan as plans
+from candidate_plan import candidate_plan, plan_hash, read_plan, primes_to
 
 
 def brute_force_plan(bases, sieve_limit, seed):
@@ -28,6 +30,46 @@ class CandidatePlanTests(unittest.TestCase):
 
     def test_deterministic_output(self):
         self.assertEqual(candidate_plan((3, 5, 7), 101, 42), candidate_plan((3, 5, 7), 101, 42))
+
+    def test_native_filter_matches_reference_with_large_and_shared_factors(self):
+        native = plans._CANDIDATE_FILTER
+        if native is None:
+            self.skipTest("native candidate filter is not installed")
+        for bases in ((3, 5, 7), (3, 3, 5), ((1 << 127) - 1, 3, 5)):
+            for limit in (2, 17, 101, 257):
+                prime = plans._prime_sieve(limit)
+                sieve = primes_to(limit)
+                factor = 2 * bases[0] * bases[1] * bases[2]
+                expected = bytearray(prime)
+                plans._filter_python(expected, sieve, factor, limit)
+                actual = bytearray(prime)
+                divisors = (plans.ctypes.c_uint64 * len(sieve))(*sieve)
+                self.assertEqual(
+                    native(
+                        (plans.ctypes.c_ubyte * len(actual)).from_buffer(actual),
+                        limit,
+                        divisors,
+                        len(sieve),
+                        str(factor).encode("ascii"),
+                    ),
+                    0,
+                )
+                self.assertEqual(actual, expected)
+
+    def test_native_plan_hash_and_order_match_reference(self):
+        native = plans._CANDIDATE_FILTER
+        if native is None:
+            self.skipTest("native candidate filter is not installed")
+        bases, limit, seed = ((1 << 127) - 1, 3, 5), 257, 12
+        native_plan = candidate_plan(bases, limit, seed)
+        saved = plans._CANDIDATE_FILTER
+        plans._CANDIDATE_FILTER = None
+        try:
+            reference_plan = candidate_plan(bases, limit, seed)
+        finally:
+            plans._CANDIDATE_FILTER = saved
+        self.assertEqual(native_plan, reference_plan)
+        self.assertEqual(plan_hash(bases, limit, seed, None, native_plan), plan_hash(bases, limit, seed, None, reference_plan))
 
     def test_malformed_plan_is_rejected(self):
         from pathlib import Path

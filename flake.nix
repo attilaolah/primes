@@ -63,6 +63,24 @@
             mainProgram = "verify";
           };
         };
+        candidateFilter = pkgs.stdenv.mkDerivation {
+          pname = "candidate-filter";
+          version = "0.1.0";
+          src = ./.;
+          nativeBuildInputs = [pkgs.pkg-config];
+          buildInputs = [pkgs.gmp];
+          dontConfigure = true;
+          buildPhase = ''
+            $CC -std=c11 -O3 -fPIC -shared "$src/candidate_filter.c" \
+              -I ${pkgs.gmp.dev}/include \
+              -L ${pkgs.gmp.out}/lib -Wl,-rpath,${pkgs.gmp.out}/lib -lgmp \
+              -o libcandidate_filter${pkgs.stdenv.hostPlatform.extensions.sharedLibrary}
+          '';
+          installPhase = ''
+            mkdir -p "$out/lib"
+            install -m755 libcandidate_filter${pkgs.stdenv.hostPlatform.extensions.sharedLibrary} "$out/lib/"
+          '';
+        };
         program = pkgs.lib.getExe verifyPkg;
         verify = {
           inherit program;
@@ -71,6 +89,7 @@
       in {
         packages = {
           verify = verifyPkg;
+          candidate-filter = candidateFilter;
           default = verifyPkg;
         };
 
