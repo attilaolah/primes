@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 import subprocess
@@ -76,7 +77,7 @@ def certify_prime(p):
             
     return save_cert(str(p), "\n".join(lines) + "\n")
 
-def get_largest_primes():
+def get_largest_primes(max_digits=None):
     primes = []
     for f in os.listdir(DATA_DIR):
         if f == "TIP" or f.startswith("."): continue
@@ -84,7 +85,9 @@ def get_largest_primes():
         with open(path) as cert:
             for line in cert:
                 if line.startswith("P "):
-                    primes.append(int(line.split()[1]))
+                    prime_str = line.split()[1]
+                    if max_digits is None or len(prime_str) <= max_digits:
+                        primes.append(int(prime_str))
                     break
     primes.sort(reverse=True)
     return primes[:3]
@@ -99,7 +102,7 @@ def calculate_optimal_sieve_limit():
     print("[*] Deep Sieve Enabled: Bypassing cache boundaries for max filtration.")
     return 5000000000
 
-def run_search():
+def run_search(max_digits=None, sieve_limit=None):
     print("[*] V3 Dynamic Fermat Search Orchestrator Started")
     print("[*] Compiling C core (v3)...")
     import platform
@@ -109,11 +112,11 @@ def run_search():
     else:
         subprocess.run(["nix-shell", "-p", "gcc", "gmp", "--run", "gcc -O3 -fopenmp worker.c -lm -lgmp -o worker"], check=True)
     
-    max_sieve = calculate_optimal_sieve_limit()
+    max_sieve = sieve_limit if sieve_limit is not None else calculate_optimal_sieve_limit()
     
     while True:
         print("\n[*] Scanning data/ for the 3 largest primes...")
-        primes = get_largest_primes()
+        primes = get_largest_primes(max_digits)
         if len(primes) < 3:
             print("[-] Not enough large primes in data/")
             return
@@ -125,15 +128,26 @@ def run_search():
             f.write(f"{p1}\n{p2}\n{p3}\n{max_sieve}\n")
             
         print("[+] Launching C core...")
-        process = subprocess.Popen(["./worker"], stdout=subprocess.PIPE, text=True)
+        process = subprocess.Popen(["./worker"], stdout=subprocess.PIPE)
+        assert process.stdout is not None
         
         cert_lines = []
         capturing = False
         
-        for line in process.stdout:
-            sys.stdout.write(line)
+        line_buffer = bytearray()
+        while True:
+            character = process.stdout.read(1)
+            if character == b"":
+                break
+            sys.stdout.buffer.write(character)
             sys.stdout.flush()
-            
+
+            if character != b"\n":
+                line_buffer.extend(character)
+                continue
+
+            line = line_buffer.decode("ascii")
+            line_buffer.clear()
             if "*** Found valid prime!" in line:
                 capturing = True
                 cert_lines = []
@@ -190,4 +204,20 @@ def run_search():
             time.sleep(2)
 
 if __name__ == "__main__":
-    run_search()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--max-digits",
+        type=int,
+        help="select only primes with at most this many decimal digits",
+    )
+    parser.add_argument(
+        "--sieve-limit",
+        type=int,
+        help="set the sieve limit used by the worker",
+    )
+    args = parser.parse_args()
+    if args.max_digits is not None and args.max_digits <= 0:
+        parser.error("--max-digits must be a positive integer")
+    if args.sieve_limit is not None and args.sieve_limit <= 0:
+        parser.error("--sieve-limit must be a positive integer")
+    run_search(args.max_digits, args.sieve_limit)

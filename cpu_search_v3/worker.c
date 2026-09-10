@@ -58,12 +58,15 @@ int main() {
         if (is_prime[p]) {
             sieve_primes[num_sieve_primes++] = p;
         }
-        if (p % extract_step == 0 || p == max_sieve) {
+        if (p % extract_step == 0 && p != max_sieve) {
             printf("\r[*] Extracting primes: %4.1f%% complete...", (double)p * 100.0 / max_sieve);
             fflush(stdout);
         }
     }
+    printf("\r[*] Extracting primes: 100.0%% complete...");
+    fflush(stdout);
     printf("\n");
+    fflush(stdout);
     
     // --- RANDOMIZE SEARCH SPACE ---
     srand((unsigned int)time(NULL));
