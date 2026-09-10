@@ -1,5 +1,6 @@
 """Stable, shared candidate-plan format for the CPU and GPU search drivers."""
 import hashlib
+import time
 
 MASK64 = (1 << 64) - 1
 MAGIC = "PRIMES_CANDIDATE_PLAN_V1"
@@ -31,8 +32,11 @@ def splitmix64(state):
 
 
 def candidate_plan(bases, sieve_limit, seed):
+    started = time.monotonic()
+    print(f"[*] Building candidate plan: sieve limit {sieve_limit}", flush=True)
     factor = 2 * bases[0] * bases[1] * bases[2]
     prime = _prime_sieve(sieve_limit)
+    print(f"[*] Candidate-plan sieve constructed ({time.monotonic() - started:.1f}s)", flush=True)
     sieve = [value for value in range(2, sieve_limit + 1) if prime[value]]
     # A prime r can divide factor*q+1 only when r does not divide factor, in
     # which case exactly one residue class of q modulo r is excluded.  Mark
@@ -43,12 +47,21 @@ def candidate_plan(bases, sieve_limit, seed):
             residue = (-pow(factor, -1, divisor)) % divisor
             count = ((sieve_limit - residue) // divisor) + 1
             eligible[residue : sieve_limit + 1 : divisor] = b"\x00" * count
-    candidates = [q for q in sieve if eligible[q]]
+    print(f"[*] Candidate-plan residue filtering complete ({time.monotonic() - started:.1f}s)", flush=True)
+    candidates = []
+    progress_interval = 1_000_000
+    for position, q in enumerate(sieve, 1):
+        if eligible[q]:
+            candidates.append(q)
+        if position % progress_interval == 0:
+            print(f"[*] Candidate collection: {position}/{len(sieve)} primes examined", flush=True)
+    print(f"[*] Candidate collection complete: {len(candidates)} candidates ({time.monotonic() - started:.1f}s)", flush=True)
     result, state = list(candidates), seed
     for index in range(len(result) - 1, 0, -1):
         state, value = splitmix64(state)
         swap = value % (index + 1)
         result[index], result[swap] = result[swap], result[index]
+    print(f"[*] Deterministic shuffle complete: {len(result)} candidates ({time.monotonic() - started:.1f}s)", flush=True)
     return result
 
 
@@ -67,10 +80,15 @@ def _body(bases, sieve_limit, seed, max_digits, candidates):
 
 
 def write_plan(path, bases, sieve_limit, seed, max_digits, candidates):
+    digest = plan_hash(bases, sieve_limit, seed, max_digits, candidates)
     body = _body(bases, sieve_limit, seed, max_digits, candidates)
-    digest = hashlib.sha256(body.encode("ascii")).hexdigest()
     path.write_text(body.replace("--\n", f"sha256={digest}\n--\n"), encoding="ascii")
     return digest
+
+
+def plan_hash(bases, sieve_limit, seed, max_digits, candidates):
+    """Return the stable hash of a candidate plan's unsigned body."""
+    return hashlib.sha256(_body(bases, sieve_limit, seed, max_digits, candidates).encode("ascii")).hexdigest()
 
 
 def read_plan(path):
