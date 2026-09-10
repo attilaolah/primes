@@ -5,6 +5,9 @@
 #include <sys/time.h>
 #include <time.h>
 #include <math.h>
+#include <errno.h>
+#include <limits.h>
+#include <string.h>
 
 #define MEDIAN_WINDOW 101
 
@@ -14,28 +17,126 @@ double get_time() {
     return tv.tv_sec + tv.tv_usec * 1e-6;
 }
 
-int main() {
-    FILE *f = fopen("search_input.txt", "r");
-    if (!f) return 1;
+static int test_plan_candidate(unsigned long q, unsigned long index, mpz_t base, mpz_t p1, mpz_t p2, mpz_t p3) {
+    int witnesses[] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97};
+    mpz_t candidate, candidate_m1, result, witness_value, exponent, q_value;
+    mpz_inits(candidate, candidate_m1, result, witness_value, exponent, q_value, NULL);
+    mpz_set_ui(q_value, q);
+    printf("TEST index=%lu q=%lu\n", index, q);
+    fflush(stdout);
+    if (mpz_probab_prime_p(q_value, 25) == 0) goto done;
+    mpz_mul_ui(candidate_m1, base, q);
+    mpz_add_ui(candidate, candidate_m1, 1);
+    for (size_t wi = 0; wi < sizeof(witnesses) / sizeof(witnesses[0]); wi++) {
+        mpz_set_ui(witness_value, witnesses[wi]);
+        mpz_powm(result, witness_value, candidate_m1, candidate);
+        if (mpz_cmp_ui(result, 1) != 0) continue;
+        mpz_divexact_ui(exponent, candidate_m1, 2);
+        mpz_powm(result, witness_value, exponent, candidate);
+        if (mpz_cmp_ui(result, 1) == 0) continue;
+        mpz_divexact_ui(exponent, candidate_m1, q);
+        mpz_powm(result, witness_value, exponent, candidate);
+        if (mpz_cmp_ui(result, 1) == 0) continue;
+        mpz_divexact(exponent, candidate_m1, p1);
+        mpz_powm(result, witness_value, exponent, candidate);
+        if (mpz_cmp_ui(result, 1) == 0) continue;
+        mpz_divexact(exponent, candidate_m1, p2);
+        mpz_powm(result, witness_value, exponent, candidate);
+        if (mpz_cmp_ui(result, 1) == 0) continue;
+        mpz_divexact(exponent, candidate_m1, p3);
+        mpz_powm(result, witness_value, exponent, candidate);
+        if (mpz_cmp_ui(result, 1) == 0) continue;
+        printf("\n*** Found valid prime! q = %lu, W = %d ***\n", q, witnesses[wi]);
+        printf("V 1\nP "); mpz_out_str(stdout, 10, candidate); printf("\nW %d\n", witnesses[wi]);
+        printf("F 2\nF %lu\nF ", q); mpz_out_str(stdout, 10, p1); printf("\nF ");
+        mpz_out_str(stdout, 10, p2); printf("\nF "); mpz_out_str(stdout, 10, p3); printf("\n");
+        break;
+    }
+done:
+    mpz_clears(candidate, candidate_m1, result, witness_value, exponent, q_value, NULL);
+    return 0;
+}
+
+static int run_plan(const char *path, mpz_t base, mpz_t p1, mpz_t p2, mpz_t p3) {
+    FILE *plan = fopen(path, "r");
+    char line[128];
+    unsigned long index = 0;
+    if (!plan) return 1;
+    while (fgets(line, sizeof(line), plan)) {
+        char *end;
+        unsigned long q;
+        size_t length = strlen(line);
+        if (length == sizeof(line) - 1 && line[length - 1] != '\n') { fclose(plan); return 1; }
+        if (length == 0 || line[length - 1] != '\n') { fclose(plan); return 1; }
+        line[length - 1] = '\0';
+        if (line[0] == '\0' || line[0] == '-' || (line[0] == '0' && line[1] != '\0')) { fclose(plan); return 1; }
+        for (char *value = line; *value; value++) if (*value < '0' || *value > '9') { fclose(plan); return 1; }
+        errno = 0;
+        q = strtoul(line, &end, 10);
+        if (errno == ERANGE || *end != '\0' || q < 2) { fclose(plan); return 1; }
+        test_plan_candidate(q, index++, base, p1, p2, p3);
+    }
+    if (ferror(plan)) { fclose(plan); return 1; }
+    fclose(plan);
+    printf("DONE\n");
+    fflush(stdout);
+    return 0;
+}
+
+static int read_plan_bases(const char *path, mpz_t p1, mpz_t p2, mpz_t p3) {
+    FILE *bases = fopen(path, "r");
+    char p1_str[50000], p2_str[50000], p3_str[50000], extra[2];
+    if (!bases) return 1;
+    if (fscanf(bases, "%49999s%49999s%49999s", p1_str, p2_str, p3_str) != 3 || fscanf(bases, "%1s", extra) == 1) {
+        fclose(bases);
+        return 1;
+    }
+    fclose(bases);
+    if (mpz_set_str(p1, p1_str, 10) != 0 || mpz_set_str(p2, p2_str, 10) != 0 || mpz_set_str(p3, p3_str, 10) != 0 ||
+        mpz_cmp_ui(p1, 2) < 0 || mpz_cmp_ui(p2, 2) < 0 || mpz_cmp_ui(p3, 2) < 0 ||
+        mpz_probab_prime_p(p1, 25) == 0 || mpz_probab_prime_p(p2, 25) == 0 || mpz_probab_prime_p(p3, 25) == 0 ||
+        mpz_cmp(p1, p2) == 0 || mpz_cmp(p1, p3) == 0 || mpz_cmp(p2, p3) == 0) return 1;
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    const char *plan_path = NULL;
+    const char *bases_path = NULL;
+    if (argc == 5 && strcmp(argv[1], "--plan") == 0 && strcmp(argv[3], "--bases") == 0) {
+        plan_path = argv[2];
+        bases_path = argv[4];
+    }
+    else if (argc != 1) return 1;
     char p1_str[50000], p2_str[50000], p3_str[50000];
     long long max_sieve = 5000000000LL;
-    if (fscanf(f, "%49999s", p1_str) != 1) { fclose(f); return 1; }
-    if (fscanf(f, "%49999s", p2_str) != 1) { fclose(f); return 1; }
-    if (fscanf(f, "%49999s", p3_str) != 1) { fclose(f); return 1; }
-    if (fscanf(f, "%lld", &max_sieve) != 1) {
-        max_sieve = 5000000000LL;
-    }
-    fclose(f);
-    
     mpz_t p1, p2, p3, base;
-    mpz_init_set_str(p1, p1_str, 10);
-    mpz_init_set_str(p2, p2_str, 10);
-    mpz_init_set_str(p3, p3_str, 10);
-    mpz_init(base);
+    mpz_inits(p1, p2, p3, base, NULL);
+    if (plan_path) {
+        if (read_plan_bases(bases_path, p1, p2, p3)) {
+            mpz_clears(p1, p2, p3, base, NULL);
+            return 1;
+        }
+    } else {
+        FILE *f = fopen("search_input.txt", "r");
+        if (!f) { mpz_clears(p1, p2, p3, base, NULL); return 1; }
+        if (fscanf(f, "%49999s", p1_str) != 1 || fscanf(f, "%49999s", p2_str) != 1 || fscanf(f, "%49999s", p3_str) != 1) {
+            fclose(f); mpz_clears(p1, p2, p3, base, NULL); return 1;
+        }
+        if (fscanf(f, "%lld", &max_sieve) != 1) max_sieve = 5000000000LL;
+        fclose(f);
+        if (mpz_set_str(p1, p1_str, 10) != 0 || mpz_set_str(p2, p2_str, 10) != 0 || mpz_set_str(p3, p3_str, 10) != 0) {
+            mpz_clears(p1, p2, p3, base, NULL); return 1;
+        }
+    }
     
     mpz_mul(base, p1, p2);
     mpz_mul(base, base, p3);
     mpz_mul_ui(base, base, 2);
+    if (plan_path) {
+        int status = run_plan(plan_path, base, p1, p2, p3);
+        mpz_clears(p1, p2, p3, base, NULL);
+        return status;
+    }
     
     // --- SIEVE INITIALIZATION ---
     printf("[*] Allocating %lld bytes and marking primes (this takes ~10 seconds)...\n", max_sieve);

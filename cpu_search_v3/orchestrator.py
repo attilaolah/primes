@@ -4,6 +4,12 @@ import sys
 import subprocess
 import hashlib
 import time
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from candidate_plan import MASK64, candidate_plan, read_plan, write_plan
 
 # Ensure we are always running from the script's directory for relative paths
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -102,7 +108,43 @@ def calculate_optimal_sieve_limit():
     print("[*] Deep Sieve Enabled: Bypassing cache boundaries for max filtration.")
     return 5000000000
 
-def run_search(max_digits=None, sieve_limit=None):
+def run_planned_search(max_digits, sieve_limit, seed, candidate_plan_path, write_candidate_plan, max_candidates):
+    if candidate_plan_path:
+        plan = read_plan(Path(candidate_plan_path))
+        if plan["max_digits"] != max_digits or plan["sieve_limit"] != sieve_limit or (seed is not None and plan["seed"] != seed):
+            raise ValueError("candidate plan metadata does not match requested options")
+        primes = get_largest_primes(max_digits)
+        if tuple(primes) != plan["bases"]:
+            raise ValueError("candidate plan bases do not match selected data certificates")
+        bases, candidates = plan["bases"], plan["candidates"]
+        digest = plan["hash"]
+    else:
+        bases = tuple(get_largest_primes(max_digits))
+        if len(bases) != 3:
+            raise ValueError("not enough eligible data certificates")
+        candidates = candidate_plan(bases, sieve_limit, seed)
+        digest = write_plan(Path(write_candidate_plan), bases, sieve_limit, seed, max_digits, candidates) if write_candidate_plan else None
+    if max_candidates is not None:
+        candidates = candidates[:max_candidates]
+    print(f"[*] Ordered plan: {len(candidates)} candidates; hash: {digest or 'generated'}")
+    with tempfile.NamedTemporaryFile("w", encoding="ascii", prefix="cpu-plan-", delete=False) as plan_file:
+        plan_file.write("\n".join(map(str, candidates)) + ("\n" if candidates else ""))
+        worker_plan = plan_file.name
+    with tempfile.NamedTemporaryFile("w", encoding="ascii", prefix="cpu-bases-", delete=False) as bases_file:
+        bases_file.write("\n".join(map(str, bases)) + "\n")
+        worker_bases = bases_file.name
+    try:
+        result = subprocess.run(["./worker", "--plan", worker_plan, "--bases", worker_bases], text=True, capture_output=True)
+        sys.stdout.write(result.stdout)
+        sys.stderr.write(result.stderr)
+        if result.returncode:
+            raise RuntimeError(f"planned worker failed ({result.returncode})")
+    finally:
+        os.unlink(worker_plan)
+        os.unlink(worker_bases)
+
+
+def run_search(max_digits=None, sieve_limit=None, seed=None, candidate_plan_path=None, write_candidate_plan=None, max_candidates=None):
     print("[*] V3 Dynamic Fermat Search Orchestrator Started")
     print("[*] Compiling C core (v3)...")
     import platform
@@ -113,6 +155,9 @@ def run_search(max_digits=None, sieve_limit=None):
         subprocess.run(["nix-shell", "-p", "gcc", "gmp", "--run", "gcc -O3 -fopenmp worker.c -lm -lgmp -o worker"], check=True)
     
     max_sieve = sieve_limit if sieve_limit is not None else calculate_optimal_sieve_limit()
+    if seed is not None or candidate_plan_path:
+        run_planned_search(max_digits, max_sieve, seed, candidate_plan_path, write_candidate_plan, max_candidates)
+        return
     
     while True:
         print("\n[*] Scanning data/ for the 3 largest primes...")
@@ -210,6 +255,10 @@ if __name__ == "__main__":
         type=int,
         help="select only primes with at most this many decimal digits",
     )
+    parser.add_argument("--seed", type=int, help="generate the deterministic ordered candidate plan with this u64 seed")
+    parser.add_argument("--candidate-plan", help="consume a persisted candidate plan")
+    parser.add_argument("--write-candidate-plan", help="persist a generated candidate plan")
+    parser.add_argument("--max-candidates", type=int, help="limit a deterministic/plan run to this many candidates")
     parser.add_argument(
         "--sieve-limit",
         type=int,
@@ -220,4 +269,16 @@ if __name__ == "__main__":
         parser.error("--max-digits must be a positive integer")
     if args.sieve_limit is not None and args.sieve_limit <= 0:
         parser.error("--sieve-limit must be a positive integer")
-    run_search(args.max_digits, args.sieve_limit)
+    if args.seed is not None and not 0 <= args.seed <= MASK64:
+        parser.error("--seed must be an unsigned 64-bit integer")
+    if args.max_candidates is not None and args.max_candidates < 0:
+        parser.error("--max-candidates must be non-negative")
+    if args.max_candidates is not None and args.seed is None and not args.candidate_plan:
+        parser.error("--max-candidates requires --seed or --candidate-plan")
+    if args.write_candidate_plan and args.seed is None:
+        parser.error("--write-candidate-plan requires --seed")
+    try:
+        run_search(args.max_digits, args.sieve_limit, args.seed, args.candidate_plan, args.write_candidate_plan, args.max_candidates)
+    except (OSError, RuntimeError, ValueError) as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        raise SystemExit(1)
