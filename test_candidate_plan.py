@@ -1,4 +1,5 @@
 import hashlib
+import io
 import unittest
 
 import candidate_plan as plans
@@ -22,6 +23,20 @@ def brute_force_plan(bases, sieve_limit, seed):
 
 
 class CandidatePlanTests(unittest.TestCase):
+    def test_candidate_collection_progress_reuses_one_line_and_terminates(self):
+        class InteractiveStream(io.StringIO):
+            def isatty(self):
+                return True
+
+        stream = InteractiveStream()
+        previous_interval = plans.COLLECTION_PROGRESS_INTERVAL
+        plans.COLLECTION_PROGRESS_INTERVAL = 2
+        try:
+            self.assertEqual(plans._collect_candidates([2, 3, 5], bytearray(b"\x00\x00\x01\x00\x01\x00"), 5, stream), [2])
+        finally:
+            plans.COLLECTION_PROGRESS_INTERVAL = previous_interval
+        self.assertEqual(stream.getvalue(), "\r[*] Candidate collection: 2/5 primes examined\r[*] Candidate collection: 5/5 primes examined\n")
+
     def test_optimized_filter_matches_brute_force(self):
         for bases in ((3, 5, 7), (5, 11, 13), (3, 3, 5)):
             for limit in (2, 10, 50, 101):
@@ -32,8 +47,8 @@ class CandidatePlanTests(unittest.TestCase):
         self.assertEqual(candidate_plan((3, 5, 7), 101, 42), candidate_plan((3, 5, 7), 101, 42))
 
     def test_native_filter_matches_reference_with_large_and_shared_factors(self):
-        native = plans._CANDIDATE_FILTER
-        if native is None:
+        library = plans._CANDIDATE_FILTER
+        if library is None:
             self.skipTest("native candidate filter is not installed")
         for bases in ((3, 5, 7), (3, 3, 5), ((1 << 127) - 1, 3, 5)):
             for limit in (2, 17, 101, 257):
@@ -42,19 +57,23 @@ class CandidatePlanTests(unittest.TestCase):
                 factor = 2 * bases[0] * bases[1] * bases[2]
                 expected = bytearray(prime)
                 plans._filter_python(expected, sieve, factor, limit)
-                actual = bytearray(prime)
-                divisors = (plans.ctypes.c_uint64 * len(sieve))(*sieve)
+                output = plans.ctypes.POINTER(plans.ctypes.c_uint64)()
+                output_count = plans.ctypes.c_size_t()
                 self.assertEqual(
-                    native(
-                        (plans.ctypes.c_ubyte * len(actual)).from_buffer(actual),
+                    library.candidate_filter_from_sieve(
+                        (plans.ctypes.c_ubyte * len(prime)).from_buffer(prime),
                         limit,
-                        divisors,
-                        len(sieve),
                         str(factor).encode("ascii"),
+                        plans.ctypes.byref(output),
+                        plans.ctypes.byref(output_count),
                     ),
                     0,
                 )
-                self.assertEqual(actual, expected)
+                try:
+                    self.assertEqual([output[index] for index in range(output_count.value)],
+                                     [q for q in sieve if expected[q]])
+                finally:
+                    library.candidate_filter_free(output)
 
     def test_native_plan_hash_and_order_match_reference(self):
         native = plans._CANDIDATE_FILTER

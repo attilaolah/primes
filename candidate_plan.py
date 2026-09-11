@@ -8,6 +8,7 @@ import time
 
 MASK64 = (1 << 64) - 1
 MAGIC = "PRIMES_CANDIDATE_PLAN_V1"
+COLLECTION_PROGRESS_INTERVAL = 20_000_000
 
 
 def _native_filter():
@@ -27,7 +28,14 @@ def _native_filter():
             ctypes.POINTER(ctypes.c_uint64), ctypes.c_size_t, ctypes.c_char_p,
         )
         library.candidate_filter.restype = ctypes.c_int
-        return library.candidate_filter
+        library.candidate_filter_from_sieve.argtypes = (
+            ctypes.POINTER(ctypes.c_ubyte), ctypes.c_uint64, ctypes.c_char_p,
+            ctypes.POINTER(ctypes.POINTER(ctypes.c_uint64)), ctypes.POINTER(ctypes.c_size_t),
+        )
+        library.candidate_filter_from_sieve.restype = ctypes.c_int
+        library.candidate_filter_free.argtypes = (ctypes.c_void_p,)
+        library.candidate_filter_free.restype = None
+        return library
     return None
 
 
@@ -75,37 +83,39 @@ def candidate_plan(bases, sieve_limit, seed):
     prime = _prime_sieve(sieve_limit)
     sieve_finished = time.monotonic()
     print(f"[*] Candidate-plan sieve constructed ({sieve_finished - started:.1f}s)", flush=True)
-    sieve = [value for value in range(2, sieve_limit + 1) if prime[value]]
     # A prime r can divide factor*q+1 only when r does not divide factor, in
     # which case exactly one residue class of q modulo r is excluded.  Mark
     # that class directly rather than testing every (q, r) pair.
-    eligible = bytearray(prime)
     if _CANDIDATE_FILTER is None:
         print("WARNING: native candidate filter unavailable; using slow Python residue filtering", file=sys.stderr, flush=True)
+        sieve = [value for value in range(2, sieve_limit + 1) if prime[value]]
+        eligible = bytearray(prime)
         _filter_python(eligible, sieve, factor, sieve_limit)
+        candidates = _collect_candidates(sieve, eligible, sieve_limit)
     else:
-        divisors = (ctypes.c_uint64 * len(sieve))(*sieve)
         factor_decimal = str(factor).encode("ascii")
-        status = _CANDIDATE_FILTER(
-            (ctypes.c_ubyte * len(eligible)).from_buffer(eligible), sieve_limit, divisors, len(sieve), factor_decimal
+        output = ctypes.POINTER(ctypes.c_uint64)()
+        output_count = ctypes.c_size_t()
+        # This enters OpenMP directly from the compact sieve, without boxing
+        # every divisor in Python.  The helper reports its actual team size.
+        status = _CANDIDATE_FILTER.candidate_filter_from_sieve(
+            (ctypes.c_ubyte * len(prime)).from_buffer(prime), sieve_limit,
+            factor_decimal, ctypes.byref(output), ctypes.byref(output_count),
         )
-        if status == 1:
-            raise RuntimeError("native candidate filter rejected a divisor")
         if status == 2:
             raise RuntimeError("native candidate filter rejected factor decimal input")
+        if status == 3:
+            raise MemoryError("native candidate filter could not allocate its working buffers")
         if status:
             raise RuntimeError(f"native candidate filter failed with status {status}")
+        try:
+            candidates = [output[index] for index in range(output_count.value)]
+        finally:
+            _CANDIDATE_FILTER.candidate_filter_free(output)
     filtering_finished = time.monotonic()
     print(f"[*] Candidate-plan residue filtering complete ({filtering_finished - sieve_finished:.1f}s)", flush=True)
-    candidates = []
-    progress_interval = 1_000_000
-    for position, q in enumerate(sieve, 1):
-        if eligible[q]:
-            candidates.append(q)
-        if position % progress_interval == 0:
-            print(f"[*] Candidate collection: {position}/{len(sieve)} primes examined", flush=True)
     collection_finished = time.monotonic()
-    print(f"[*] Candidate collection complete: {len(candidates)} candidates ({collection_finished - filtering_finished:.1f}s)", flush=True)
+    print(f"\r[*] Candidate collection complete: {len(candidates)} candidates ({collection_finished - filtering_finished:.1f}s)", flush=True)
     result, state = list(candidates), seed
     for index in range(len(result) - 1, 0, -1):
         state, value = splitmix64(state)
@@ -122,6 +132,26 @@ def _filter_python(eligible, sieve, factor, sieve_limit):
             residue = (-pow(factor, -1, divisor)) % divisor
             count = ((sieve_limit - residue) // divisor) + 1
             eligible[residue : sieve_limit + 1 : divisor] = b"\x00" * count
+
+
+def _collect_candidates(sieve, eligible, sieve_limit, stream=None):
+    """Collect eligible primes while updating an interactive progress line."""
+    if stream is None:
+        stream = sys.stdout
+    interactive = stream.isatty()
+    candidates = []
+    next_report = COLLECTION_PROGRESS_INTERVAL
+    reported_progress = False
+    for q in sieve:
+        if eligible[q]:
+            candidates.append(q)
+        if interactive and q >= next_report:
+            print(f"\r[*] Candidate collection: {q}/{sieve_limit} primes examined", end="", file=stream, flush=True)
+            next_report += COLLECTION_PROGRESS_INTERVAL
+            reported_progress = True
+    if reported_progress:
+        print(file=stream, flush=True)
+    return candidates
 
 
 def _body(bases, sieve_limit, seed, max_digits, candidates):

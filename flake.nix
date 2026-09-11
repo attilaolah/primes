@@ -68,12 +68,13 @@
           version = "0.1.0";
           src = ./.;
           nativeBuildInputs = [pkgs.pkg-config];
-          buildInputs = [pkgs.gmp];
+          buildInputs = [pkgs.gmp pkgs.stdenv.cc.cc.lib];
           dontConfigure = true;
           buildPhase = ''
-            $CC -std=c11 -O3 -fPIC -shared "$src/candidate_filter.c" \
+            $CC -std=c11 -O3 -fPIC -shared -fopenmp "$src/candidate_filter.c" \
               -I ${pkgs.gmp.dev}/include \
-              -L ${pkgs.gmp.out}/lib -Wl,-rpath,${pkgs.gmp.out}/lib -lgmp \
+              -L ${pkgs.gmp.out}/lib -Wl,-rpath,${pkgs.gmp.out}/lib \
+              -Wl,-rpath,${pkgs.stdenv.cc.cc.lib}/lib -lgmp \
               -o libcandidate_filter${pkgs.stdenv.hostPlatform.extensions.sharedLibrary}
           '';
           installPhase = ''
