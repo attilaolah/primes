@@ -1,5 +1,6 @@
 #include <gmp.h>
 #include <omp.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
