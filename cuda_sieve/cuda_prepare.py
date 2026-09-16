@@ -1,3 +1,6 @@
+# Copyright (c) 2026
+"""Prepare candidate survivors using the pre-built CUDA sieve binaries."""
+
 import os
 import pathlib
 import subprocess
@@ -13,6 +16,7 @@ DATA_DIR = "../data"
 
 
 def get_largest_primes():
+    """Return the three largest base primes found in the certificate data."""
     primes = []
     for f in os.listdir(DATA_DIR):
         if f == "TIP" or f.startswith("."):
@@ -28,6 +32,7 @@ def get_largest_primes():
 
 
 def main() -> None:
+    """Run the CUDA sieve across the configured sieve limits."""
     # The `sieve` and `generate_input` binaries are expected to have been
     # built already, e.g. by `nix build .#cuda-sieve`.
 

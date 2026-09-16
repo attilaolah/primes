@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026
 """Run the CUDA candidate pre-sieve continuously and resume its output file."""
 
 import argparse
@@ -17,6 +18,11 @@ UINT64_MAX = (1 << 64) - 1
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse and validate the command line arguments.
+
+    Returns:
+        The parsed command line arguments.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--primes-file", required=True, type=Path)
     parser.add_argument("--batch-size", type=int, default=10_000_000)
@@ -30,6 +36,18 @@ def parse_args() -> argparse.Namespace:
 
 
 def read_primes(path: Path) -> tuple[int, int, int]:
+    """Read the first three integer lines from the primes file.
+
+    Args:
+        path: Text file whose first three lines are the base primes.
+
+    Returns:
+        The three base primes P1, P2 and P3.
+
+    Raises:
+        SystemExit: If the file is unreadable or the first three lines are not
+            positive integers.
+    """
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
         primes = tuple(int(line.strip()) for line in lines[:3])
@@ -45,6 +63,15 @@ def read_primes(path: Path) -> tuple[int, int, int]:
 
 
 def resume_q_start(output: Path) -> int:
+    """Determine the next candidate value based on the last line of the file.
+
+    Args:
+        output: The candidates output file to resume from.
+
+    Returns:
+        The value of the last recorded candidate plus two, or the default
+        starting value when the file is missing or empty.
+    """
     if not output.exists() or output.stat().st_size == 0:
         return DEFAULT_Q_START
     with output.open("rb") as candidate_file:
@@ -68,6 +95,14 @@ def resume_q_start(output: Path) -> int:
 
 
 def limbs_for(value: int) -> list[int]:
+    """Split a value into 32-bit little-endian limbs.
+
+    Args:
+        value: Integer value to be split into limbs.
+
+    Returns:
+        List of 32-bit limbs, with the least significant first.
+    """
     limbs = []
     while value:
         limbs.append(value & UINT32_MAX)
@@ -83,6 +118,22 @@ def run_batch(
     batch_size: int,
     sieve_limit: int,
 ) -> tuple[int, bytes]:
+    """Run one sieve batch and return the survivor count and flag bytes.
+
+    Args:
+        generate_input: Path to the pre-built input generator binary.
+        sieve: Path to the pre-built CUDA sieve binary.
+        limbs: Base value split into 32-bit little-endian limbs.
+        q_start: First candidate value in the batch.
+        batch_size: Number of candidates in the batch.
+        sieve_limit: Prime limit used by the sieve.
+
+    Returns:
+        The number of surviving candidates and the raw flag bytes.
+
+    Raises:
+        RuntimeError: If the binary produces an unexpected number of bytes.
+    """
     with tempfile.TemporaryDirectory(prefix="cuda-sieve-") as temporary_directory:
         workdir = Path(temporary_directory)
         limb_file = workdir / "base_limbs.txt"
@@ -110,6 +161,16 @@ def run_batch(
 
 
 def append_survivors(output_path: Path, flags: bytes, q_start: int) -> int:
+    """Append surviving candidate values to the output file.
+
+    Args:
+        output_path: Candidate file to append to.
+        flags: Raw "is bad" flag bytes from the sieve.
+        q_start: First candidate value in the batch.
+
+    Returns:
+        The number of survivors that were appended.
+    """
     survivors = 0
     with output_path.open("a", encoding="ascii") as candidate_file:
         for offset, is_bad in enumerate(flags):
@@ -120,6 +181,11 @@ def append_survivors(output_path: Path, flags: bytes, q_start: int) -> int:
 
 
 def main() -> None:
+    """Run the CUDA pre-sieve indefinitely, resuming from saved candidates.
+
+    Raises:
+        RuntimeError: If the candidate range would exceed 64 bits.
+    """
     sys.set_int_max_str_digits(0)
     args = parse_args()
     primes = read_primes(args.primes_file)
