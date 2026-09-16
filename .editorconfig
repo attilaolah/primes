@@ -1,0 +1,31 @@
+# EditorConfig: https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+indent_size = 4
+rulers = [120,220]
+quote_type = double
+
+# Backend + Frontend
+[*.{css,html,js,json,mjs,mts,py,pyi,rs,sass,scss,sh,toml,ts,tsx,xml}]
+indent_style = space
+
+[*.md]
+max_line_length = off
+
+[*.{nix,yaml,yml}]
+indent_size = 2
+
+# Backend
+[*.{py,pyi,rs}]
+max_line_length = 120
+
+# Frontend
+[*.{css,html,js,mjs,mts,sass,scss,ts,tsx,xml}]
+max_line_length = 220
