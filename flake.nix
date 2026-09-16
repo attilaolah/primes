@@ -143,7 +143,7 @@
         };
 
         devShells.default = pkgs.mkShell {
-          packages = [pkgs.ruff];
+          packages = [pkgs.ruff pkgs.pyright cudaSievePython];
         };
 
         checks = {

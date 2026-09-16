@@ -103,7 +103,7 @@ def limbs_for(value: int) -> list[int]:
     Returns:
         List of 32-bit limbs, with the least significant first.
     """
-    limbs = []
+    limbs: list[int] = []
     while value:
         limbs.append(value & UINT32_MAX)
         value >>= 32

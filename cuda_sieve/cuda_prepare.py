@@ -5,7 +5,6 @@ import os
 import pathlib
 import subprocess
 import sys
-import time
 
 # Ensure we run from the correct directory
 os.chdir(pathlib.Path(pathlib.Path(__file__).resolve()).parent)
@@ -15,9 +14,9 @@ sys.set_int_max_str_digits(0)
 DATA_DIR = "../data"
 
 
-def get_largest_primes():
+def get_largest_primes() -> list[int]:
     """Return the three largest base primes found in the certificate data."""
-    primes = []
+    primes: list[int] = []
     for f in os.listdir(DATA_DIR):
         if f == "TIP" or f.startswith("."):
             continue
@@ -43,7 +42,7 @@ def main() -> None:
 
     # Convert base to 32-bit limbs (little endian)
     temp = base
-    base_limbs = []
+    base_limbs: list[int] = []
     while temp > 0:
         base_limbs.append(temp & 0xFFFFFFFF)
         temp >>= 32
@@ -58,7 +57,6 @@ def main() -> None:
     for size in sieve_sizes:
 
         # A. Generate primes and binary input via C helper
-        t0 = time.time()
         cmd = [
             "./generate_input",
             str(len(base_limbs)),
@@ -67,15 +65,11 @@ def main() -> None:
             str(size),
         ] + [str(x) for x in base_limbs]
         subprocess.run(cmd, check=True)
-        t1 = time.time()
 
         # B. Run GPU Sieve
-        t0 = time.time()
         env = os.environ.copy()
         env["LD_LIBRARY_PATH"] = "/run/opengl-driver/lib"
         subprocess.run(["./sieve"], check=True, env=env)
-        t1 = time.time()
-        t1 - t0
 
         # C. Read output and find survivors
         with pathlib.Path("sieve_output.bin").open("rb") as f:
