@@ -142,6 +142,10 @@
           default = verify;
         };
 
+        devShells.default = pkgs.mkShell {
+          packages = [pkgs.ruff];
+        };
+
         checks = {
           verify-small = pkgs.runCommand "verify-small" {} ''
             id=$(printf "3" | sha256sum | cut -c1-16)

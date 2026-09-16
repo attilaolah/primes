@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import struct
 import subprocess
 
 # Ensure we run from the correct directory
@@ -14,7 +13,8 @@ DATA_DIR = "../data"
 def get_largest_primes():
     primes = []
     for f in os.listdir(DATA_DIR):
-        if f == "TIP" or f.startswith("."): continue
+        if f == "TIP" or f.startswith("."):
+            continue
         path = os.path.join(DATA_DIR, f)
         with open(path) as cert:
             for line in cert:
@@ -55,7 +55,7 @@ def main():
     sieve_sizes = [10**9, 10**10]
     
     for size in sieve_sizes:
-        print(f"\n======================================")
+        print("\n======================================")
         print(f"[*] Executing Sieve Limit: {size:,}")
         
         # A. Generate primes and binary input via C helper
