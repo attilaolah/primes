@@ -1,0 +1,57 @@
+[project]
+name = "primes"
+version = "0.1.0"
+description = "Pratt certificate verifier"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "rich>=15.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+]
+
+# Using Flit core build backend, as described here:
+# https://flit.pypa.io/en/stable/pyproject_toml.html#build-system-section
+[build-system]
+requires = ["flit_core~=4.0"]
+# https://packaging.python.org/en/latest/guides/tool-recommendations/#build-backends
+build-backend = "flit_core.buildapi"
+
+[tool.flit.module]
+name = "cuda_sieve"
+
+[tool.black]
+line-length = 119
+target-version = ["py314"]
+
+[tool.ruff.lint]
+preview = true
+select = [
+    "ALL",
+    "multi-line-summary-first-line",
+]
+ignore = [
+    "multi-line-summary-second-line",  # conflicts multi-line-summary-first-line
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["assert"]  # asserts allowed in tests
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 119
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["configuration", "conftest", "domain", "environment", "main"]
+
+[tool.usort.known]
+known-first-party = ["configuration", "conftest", "domain", "environment", "main"]
+
+[tool.pyright]
+strict = ["."]
