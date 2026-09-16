@@ -1,7 +1,7 @@
 import os
+import subprocess
 import sys
 import time
-import subprocess
 
 # Ensure we run from the correct directory
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -87,8 +87,7 @@ def main():
         
         # Save survivors
         with open(f"survivors_{size}.txt", "w") as f:
-            for s in survivors:
-                f.write(f"{s}\n")
+            f.writelines(f"{s}\n" for s in survivors)
                 
     print("\n[*] GPU Sieve complete! Candidates saved to text files ready for scp.")
 

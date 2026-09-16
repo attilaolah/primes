@@ -11,7 +11,6 @@ from pathlib import Path
 
 from rich.progress import Progress
 
-
 DEFAULT_Q_START = 1_000_000_001
 UINT32_MAX = (1 << 32) - 1
 UINT64_MAX = (1 << 64) - 1
