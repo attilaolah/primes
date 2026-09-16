@@ -1,6 +1,8 @@
+/GPU_FERMAT_PERFORMANCE_PLAN.md
 /cpu_search_v3/search_input.txt
 /cpu_search_v3/worker
 /result
 /target
+/tensor-core-ntt/
 /.cache
 __pycache__
