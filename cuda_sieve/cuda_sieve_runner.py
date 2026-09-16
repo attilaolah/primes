@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Run the CUDA candidate pre-sieve continuously and resume its output file."""
 
 import argparse
@@ -34,7 +33,9 @@ def read_primes(path: Path) -> tuple[int, int, int]:
         lines = path.read_text(encoding="utf-8").splitlines()
         primes = tuple(int(line.strip()) for line in lines[:3])
     except (OSError, ValueError) as error:
-        raise SystemExit(f"could not read three integer primes from {path}: {error}") from error
+        raise SystemExit(
+            f"could not read three integer primes from {path}: {error}"
+        ) from error
     if len(primes) != 3 or any(prime <= 0 for prime in primes):
         raise SystemExit(f"{path} must begin with three positive integer primes")
     return primes
@@ -72,7 +73,12 @@ def limbs_for(value: int) -> list[int]:
 
 
 def run_batch(
-    generate_input: Path, sieve: Path, limbs: list[int], q_start: int, batch_size: int, sieve_limit: int
+    generate_input: Path,
+    sieve: Path,
+    limbs: list[int],
+    q_start: int,
+    batch_size: int,
+    sieve_limit: int,
 ) -> tuple[int, bytes]:
     with tempfile.TemporaryDirectory(prefix="cuda-sieve-") as temporary_directory:
         workdir = Path(temporary_directory)
@@ -113,7 +119,9 @@ def main() -> None:
     sys.set_int_max_str_digits(0)
     args = parse_args()
     primes = read_primes(args.primes_file)
-    fingerprint = hashlib.sha256("_".join(map(str, primes)).encode("ascii")).hexdigest()[:8]
+    fingerprint = hashlib.sha256(
+        "_".join(map(str, primes)).encode("ascii")
+    ).hexdigest()[:8]
     output_path = Path.cwd() / f"candidates_{fingerprint}.txt"
     q_start = resume_q_start(output_path)
     base_limbs = limbs_for(primes[0] * primes[1] * primes[2] * 2)
@@ -125,13 +133,21 @@ def main() -> None:
     try:
         with Progress() as progress:
             task = progress.add_task(
-                "CUDA pre-sieve", q_start=q_start, sieve_limit=args.sieve_limit, survivors=total_survivors
+                "CUDA pre-sieve",
+                q_start=q_start,
+                sieve_limit=args.sieve_limit,
+                survivors=total_survivors,
             )
             while True:
                 if q_start + 2 * (args.batch_size - 1) > UINT64_MAX:
                     raise RuntimeError("candidate range exceeds uint64_t")
                 _, flags = run_batch(
-                    generate_input, sieve, base_limbs, q_start, args.batch_size, args.sieve_limit
+                    generate_input,
+                    sieve,
+                    base_limbs,
+                    q_start,
+                    args.batch_size,
+                    args.sieve_limit,
                 )
                 total_survivors += append_survivors(output_path, flags, q_start)
                 q_start += 2 * args.batch_size
