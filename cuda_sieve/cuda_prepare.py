@@ -25,7 +25,7 @@ def get_largest_primes():
     return primes[:3]
 
 def main():
-    print("[*] GPU Sieve Profiler Starting...")
+    print("[*] CUDA Sieve Profiler Starting...")
     
     print("[*] Compiling C Input Generator...")
     subprocess.run(["nix-shell", "-p", "gcc", "--run", "gcc -O3 generate_input.c -o generate_input"], check=True)
@@ -72,7 +72,7 @@ def main():
         subprocess.run(["./sieve"], check=True, env=env)
         t1 = time.time()
         gpu_time = t1 - t0
-        print(f"  -> [GPU KERNEL] Sieve execution took: {gpu_time:.4f}s")
+        print(f"  -> [CUDA KERNEL] Sieve execution took: {gpu_time:.4f}s")
         
         # C. Read output and find survivors
         with open("sieve_output.bin", "rb") as f:

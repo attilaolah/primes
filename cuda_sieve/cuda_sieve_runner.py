@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the GPU candidate pre-sieve continuously and resume its output file."""
+"""Run the CUDA candidate pre-sieve continuously and resume its output file."""
 
 import argparse
 import hashlib
@@ -75,7 +75,7 @@ def limbs_for(value: int) -> list[int]:
 def run_batch(
     generate_input: Path, sieve: Path, limbs: list[int], q_start: int, batch_size: int, sieve_limit: int
 ) -> tuple[int, bytes]:
-    with tempfile.TemporaryDirectory(prefix="gpu-sieve-") as temporary_directory:
+    with tempfile.TemporaryDirectory(prefix="cuda-sieve-") as temporary_directory:
         workdir = Path(temporary_directory)
         limb_file = workdir / "base_limbs.txt"
         limb_file.write_text("\n".join(map(str, limbs)) + "\n", encoding="ascii")
@@ -126,7 +126,7 @@ def main() -> None:
     try:
         with Progress() as progress:
             task = progress.add_task(
-                "GPU pre-sieve", q_start=q_start, sieve_limit=args.sieve_limit, survivors=total_survivors
+                "CUDA pre-sieve", q_start=q_start, sieve_limit=args.sieve_limit, survivors=total_survivors
             )
             while True:
                 if q_start + 2 * (args.batch_size - 1) > UINT64_MAX:
@@ -139,7 +139,7 @@ def main() -> None:
                 progress.update(
                     task,
                     description=(
-                        f"GPU pre-sieve q={q_start:,} limit={args.sieve_limit:,} "
+                        f"CUDA pre-sieve q={q_start:,} limit={args.sieve_limit:,} "
                         f"survivors={total_survivors:,}"
                     ),
                 )

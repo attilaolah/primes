@@ -85,16 +85,16 @@
             install -m755 libcandidate_filter${pkgs.stdenv.hostPlatform.extensions.sharedLibrary} "$out/lib/"
           '';
         };
-        gpuSievePython = pkgs.python3.withPackages (ps: [ps.rich]);
-        gpuSieve = pkgs.stdenv.mkDerivation {
-          pname = "gpu-sieve";
+        cudaSievePython = pkgs.python3.withPackages (ps: [ps.rich]);
+        cudaSieve = pkgs.stdenv.mkDerivation {
+          pname = "cuda-sieve";
           version = "0.1.0";
           src = pkgs.lib.fileset.toSource {
             root = ./.;
             fileset = pkgs.lib.fileset.unions [
-              ./gpu_sieve/sieve.cu
-              ./gpu_sieve/generate_input.c
-              ./gpu_sieve/sieve_runner.py
+              ./cuda_sieve/sieve.cu
+              ./cuda_sieve/generate_input.c
+              ./cuda_sieve/cuda_sieve_runner.py
             ];
           };
           nativeBuildInputs = [pkgs.cudaPackages.cuda_nvcc pkgs.makeWrapper];
@@ -103,21 +103,21 @@
           buildPhase = ''
             runHook preBuild
             mkdir -p "$out/bin"
-            nvcc -O3 -arch=native gpu_sieve/sieve.cu -o "$out/bin/sieve"
-            gcc -O3 gpu_sieve/generate_input.c -o "$out/bin/generate_input"
+            nvcc -O3 -arch=native cuda_sieve/sieve.cu -o "$out/bin/sieve"
+            gcc -O3 cuda_sieve/generate_input.c -o "$out/bin/generate_input"
             runHook postBuild
           '';
           installPhase = ''
             runHook preInstall
-            install -m755 gpu_sieve/sieve_runner.py "$out/bin/sieve-runner"
-            wrapProgram "$out/bin/sieve-runner" \
+            install -m755 cuda_sieve/cuda_sieve_runner.py "$out/bin/cuda-sieve-runner"
+            wrapProgram "$out/bin/cuda-sieve-runner" \
               --prefix PATH : "$out/bin" \
-              --prefix PATH : ${gpuSievePython}/bin
+              --prefix PATH : ${cudaSievePython}/bin
             runHook postInstall
           '';
           meta = {
-            description = "GPU-backed infinite candidate pre-sieve.";
-            mainProgram = "sieve-runner";
+            description = "CUDA-backed infinite candidate pre-sieve.";
+            mainProgram = "cuda-sieve-runner";
           };
         };
         program = pkgs.lib.getExe verifyPkg;
@@ -129,14 +129,14 @@
         packages = {
           verify = verifyPkg;
           candidate-filter = candidateFilter;
-          gpu-sieve = gpuSieve;
+          cuda-sieve = cudaSieve;
           default = verifyPkg;
         };
 
         apps = {
           inherit verify;
-          gpu-sieve = {
-            program = "${gpuSieve}/bin/sieve-runner";
+          cuda-sieve = {
+            program = "${cudaSieve}/bin/cuda-sieve-runner";
             type = "app";
           };
           default = verify;
