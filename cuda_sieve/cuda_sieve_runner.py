@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026
-"""Run the CUDA candidate pre-sieve continuously and resume its output file."""
+"""Run the CUDA candidate pre-sieve continuously and resume its output file.
+
+© 2026 Attila Oláh
+"""
 
 import argparse
+import contextlib
 import hashlib
 import os
 import subprocess
@@ -15,6 +19,8 @@ from rich.progress import Progress
 DEFAULT_Q_START = 1_000_000_001
 UINT32_MAX = (1 << 32) - 1
 UINT64_MAX = (1 << 64) - 1
+_BASE_PRIME_COUNT = 3
+_MIN_SIEVE_LIMIT = 2
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,7 +36,7 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if not 0 < args.batch_size <= UINT32_MAX:
         parser.error("--batch-size must be between 1 and 4294967295")
-    if args.sieve_limit < 2:
+    if args.sieve_limit < _MIN_SIEVE_LIMIT:
         parser.error("--sieve-limit must be at least 2")
     return args
 
@@ -50,13 +56,13 @@ def read_primes(path: Path) -> tuple[int, int, int]:
     """
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
-        primes = tuple(int(line.strip()) for line in lines[:3])
+        primes = tuple(int(line.strip()) for line in lines[:_BASE_PRIME_COUNT])
     except (OSError, ValueError) as error:
         msg = f"could not read three integer primes from {path}: {error}"
         raise SystemExit(
             msg,
         ) from error
-    if len(primes) != 3 or any(prime <= 0 for prime in primes):
+    if len(primes) != _BASE_PRIME_COUNT or any(prime <= 0 for prime in primes):
         msg = f"{path} must begin with three positive integer primes"
         raise SystemExit(msg)
     return primes
@@ -180,12 +186,62 @@ def append_survivors(output_path: Path, flags: bytes, q_start: int) -> int:
     return survivors
 
 
-def main() -> None:
-    """Run the CUDA pre-sieve indefinitely, resuming from saved candidates.
+def _run_forever(
+    generate_input: Path,
+    sieve: Path,
+    output_path: Path,
+    base_limbs: list[int],
+    q_start: int,
+    batch_size: int,
+    sieve_limit: int,
+) -> None:
+    """Run batches of candidates forever, appending survivors to the output file.
+
+    Args:
+        generate_input: Path to the pre-built input generator binary.
+        sieve: Path to the pre-built CUDA sieve binary.
+        output_path: Candidate file to append survivors to.
+        base_limbs: Base value split into 32-bit little-endian limbs.
+        q_start: First candidate value to test.
+        batch_size: Number of candidates per batch.
+        sieve_limit: Prime limit used by the sieve.
 
     Raises:
         RuntimeError: If the candidate range would exceed 64 bits.
     """
+    total_survivors = 0
+    with Progress() as progress:
+        task = progress.add_task(
+            "CUDA pre-sieve",
+            q_start=q_start,
+            sieve_limit=sieve_limit,
+            survivors=total_survivors,
+        )
+        while True:
+            if q_start + 2 * (batch_size - 1) > UINT64_MAX:
+                msg = "candidate range exceeds uint64_t"
+                raise RuntimeError(msg)
+            _, flags = run_batch(
+                generate_input,
+                sieve,
+                base_limbs,
+                q_start,
+                batch_size,
+                sieve_limit,
+            )
+            total_survivors += append_survivors(output_path, flags, q_start)
+            q_start += 2 * batch_size
+            progress.update(
+                task,
+                description=(
+                    f"CUDA pre-sieve q={q_start:,} limit={sieve_limit:,} "
+                    f"survivors={total_survivors:,}"
+                ),
+            )
+
+
+def main() -> None:
+    """Run the CUDA pre-sieve indefinitely, resuming from saved candidates."""
     sys.set_int_max_str_digits(0)
     args = parse_args()
     primes = read_primes(args.primes_file)
@@ -198,39 +254,17 @@ def main() -> None:
     binary_directory = Path(__file__).resolve().parent
     generate_input = binary_directory / "generate_input"
     sieve = binary_directory / "sieve"
-    total_survivors = 0
 
-    try:
-        with Progress() as progress:
-            task = progress.add_task(
-                "CUDA pre-sieve",
-                q_start=q_start,
-                sieve_limit=args.sieve_limit,
-                survivors=total_survivors,
-            )
-            while True:
-                if q_start + 2 * (args.batch_size - 1) > UINT64_MAX:
-                    msg = "candidate range exceeds uint64_t"
-                    raise RuntimeError(msg)
-                _, flags = run_batch(
-                    generate_input,
-                    sieve,
-                    base_limbs,
-                    q_start,
-                    args.batch_size,
-                    args.sieve_limit,
-                )
-                total_survivors += append_survivors(output_path, flags, q_start)
-                q_start += 2 * args.batch_size
-                progress.update(
-                    task,
-                    description=(
-                        f"CUDA pre-sieve q={q_start:,} limit={args.sieve_limit:,} "
-                        f"survivors={total_survivors:,}"
-                    ),
-                )
-    except KeyboardInterrupt:
-        pass
+    with contextlib.suppress(KeyboardInterrupt):
+        _run_forever(
+            generate_input,
+            sieve,
+            output_path,
+            base_limbs,
+            q_start,
+            args.batch_size,
+            args.sieve_limit,
+        )
 
 
 if __name__ == "__main__":
