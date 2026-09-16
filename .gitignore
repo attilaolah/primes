@@ -5,4 +5,5 @@
 /target
 /tensor-core-ntt/
 /.cache
+/.direnv
 __pycache__
