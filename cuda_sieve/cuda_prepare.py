@@ -1,5 +1,7 @@
-# Copyright (c) 2026
-"""Prepare candidate survivors using the pre-built CUDA sieve binaries."""
+"""Prepare candidate survivors using the pre-built CUDA sieve binaries.
+
+© 2026 Attila Oláh
+"""
 
 import os
 import pathlib
@@ -63,7 +65,8 @@ def main() -> None:
             str(N_CANDIDATES),
             str(Q_START),
             str(size),
-        ] + [str(x) for x in base_limbs]
+            *map(str, base_limbs),
+        ]
         subprocess.run(cmd, check=True)
 
         # B. Run GPU Sieve
