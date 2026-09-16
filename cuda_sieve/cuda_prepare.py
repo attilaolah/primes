@@ -1,10 +1,11 @@
 import os
+import pathlib
 import subprocess
 import sys
 import time
 
 # Ensure we run from the correct directory
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(pathlib.Path(pathlib.Path(__file__).resolve()).parent)
 
 sys.set_int_max_str_digits(0)
 
@@ -17,7 +18,7 @@ def get_largest_primes():
         if f == "TIP" or f.startswith("."):
             continue
         path = os.path.join(DATA_DIR, f)
-        with open(path) as cert:
+        with pathlib.Path(path).open(encoding="utf-8") as cert:
             for line in cert:
                 if line.startswith("P "):
                     primes.append(int(line.split()[1]))
@@ -26,34 +27,9 @@ def get_largest_primes():
     return primes[:3]
 
 
-def main():
-    print("[*] CUDA Sieve Profiler Starting...")
-
-    print("[*] Compiling C Input Generator...")
-    subprocess.run(
-        [
-            "nix-shell",
-            "-p",
-            "gcc",
-            "--run",
-            "gcc -O3 generate_input.c -o generate_input",
-        ],
-        check=True,
-    )
-
-    print("[*] Compiling CUDA Sieve Kernel...")
-    subprocess.run(
-        [
-            "env",
-            "NIXPKGS_ALLOW_UNFREE=1",
-            "nix-shell",
-            "-p",
-            "cudatoolkit",
-            "--run",
-            "nvcc -O3 -arch=native sieve.cu -o sieve",
-        ],
-        check=True,
-    )
+def main() -> None:
+    # The `sieve` and `generate_input` binaries are expected to have been
+    # built already, e.g. by `nix build .#cuda-sieve`.
 
     # 2. Get base primes
     primes = get_largest_primes()
@@ -67,8 +43,6 @@ def main():
         base_limbs.append(temp & 0xFFFFFFFF)
         temp >>= 32
 
-    print(f"[*] Base is {len(base_limbs)} limbs (32-bit).")
-
     # 3. Parameters for production run
     # Let's run a massive 10 Million candidates through a 10 Billion prime limit
     N_CANDIDATES = 10000000
@@ -77,8 +51,6 @@ def main():
     sieve_sizes = [10**9, 10**10]
 
     for size in sieve_sizes:
-        print("\n======================================")
-        print(f"[*] Executing Sieve Limit: {size:,}")
 
         # A. Generate primes and binary input via C helper
         t0 = time.time()
@@ -91,7 +63,6 @@ def main():
         ] + [str(x) for x in base_limbs]
         subprocess.run(cmd, check=True)
         t1 = time.time()
-        print(f"  -> Generated primes and wrote payload in {t1-t0:.2f}s")
 
         # B. Run GPU Sieve
         t0 = time.time()
@@ -99,27 +70,17 @@ def main():
         env["LD_LIBRARY_PATH"] = "/run/opengl-driver/lib"
         subprocess.run(["./sieve"], check=True, env=env)
         t1 = time.time()
-        gpu_time = t1 - t0
-        print(f"  -> [CUDA KERNEL] Sieve execution took: {gpu_time:.4f}s")
+        t1 - t0
 
         # C. Read output and find survivors
-        with open("sieve_output.bin", "rb") as f:
+        with pathlib.Path("sieve_output.bin").open("rb") as f:
             is_bad = f.read(N_CANDIDATES)
 
-        survivors = []
-        for k in range(N_CANDIDATES):
-            if is_bad[k] == 0:
-                survivors.append(Q_START + 2 * k)
-
-        print(
-            f"  -> Out of {N_CANDIDATES:,} candidates, {len(survivors):,} survived the {size:,} sieve."
-        )
+        survivors = [Q_START + 2 * k for k in range(N_CANDIDATES) if is_bad[k] == 0]
 
         # Save survivors
-        with open(f"survivors_{size}.txt", "w") as f:
+        with pathlib.Path(f"survivors_{size}.txt").open("w", encoding="utf-8") as f:
             f.writelines(f"{s}\n" for s in survivors)
-
-    print("\n[*] GPU Sieve complete! Candidates saved to text files ready for scp.")
 
 
 if __name__ == "__main__":

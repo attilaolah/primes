@@ -97,8 +97,8 @@
               ./cuda_sieve/cuda_sieve_runner.py
             ];
           };
-          nativeBuildInputs = [pkgs.cudaPackages.cuda_nvcc pkgs.makeWrapper];
-          buildInputs = [pkgs.cudaPackages.cudatoolkit];
+          nativeBuildInputs = [pkgs.cudaPackages_13_4.cuda_nvcc pkgs.makeWrapper];
+          buildInputs = [pkgs.cudaPackages_13_4.cudatoolkit];
           dontConfigure = true;
           buildPhase = ''
             runHook preBuild

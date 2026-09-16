@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Run the CUDA candidate pre-sieve continuously and resume its output file."""
 
 import argparse
@@ -33,11 +34,13 @@ def read_primes(path: Path) -> tuple[int, int, int]:
         lines = path.read_text(encoding="utf-8").splitlines()
         primes = tuple(int(line.strip()) for line in lines[:3])
     except (OSError, ValueError) as error:
+        msg = f"could not read three integer primes from {path}: {error}"
         raise SystemExit(
-            f"could not read three integer primes from {path}: {error}"
+            msg,
         ) from error
     if len(primes) != 3 or any(prime <= 0 for prime in primes):
-        raise SystemExit(f"{path} must begin with three positive integer primes")
+        msg = f"{path} must begin with three positive integer primes"
+        raise SystemExit(msg)
     return primes
 
 
@@ -101,7 +104,8 @@ def run_batch(
         subprocess.run([str(sieve)], check=True, cwd=workdir, env=environment)
         output = (workdir / "sieve_output.bin").read_bytes()
     if len(output) != batch_size:
-        raise RuntimeError(f"sieve produced {len(output)} bytes, expected {batch_size}")
+        msg = f"sieve produced {len(output)} bytes, expected {batch_size}"
+        raise RuntimeError(msg)
     return sum(flag == 0 for flag in output), output
 
 
@@ -120,7 +124,7 @@ def main() -> None:
     args = parse_args()
     primes = read_primes(args.primes_file)
     fingerprint = hashlib.sha256(
-        "_".join(map(str, primes)).encode("ascii")
+        "_".join(map(str, primes)).encode("ascii"),
     ).hexdigest()[:8]
     output_path = Path.cwd() / f"candidates_{fingerprint}.txt"
     q_start = resume_q_start(output_path)
@@ -140,7 +144,8 @@ def main() -> None:
             )
             while True:
                 if q_start + 2 * (args.batch_size - 1) > UINT64_MAX:
-                    raise RuntimeError("candidate range exceeds uint64_t")
+                    msg = "candidate range exceeds uint64_t"
+                    raise RuntimeError(msg)
                 _, flags = run_batch(
                     generate_input,
                     sieve,
@@ -159,7 +164,7 @@ def main() -> None:
                     ),
                 )
     except KeyboardInterrupt:
-        print(f"\nStopped. Candidates are saved in {output_path}.")
+        pass
 
 
 if __name__ == "__main__":
