@@ -6,4 +6,5 @@
 /tensor-core-ntt/
 /.cache
 /.direnv
+/.codebase-memory
 __pycache__
