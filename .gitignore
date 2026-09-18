@@ -8,3 +8,4 @@
 /.direnv
 /.codebase-memory
 __pycache__
+*.log
